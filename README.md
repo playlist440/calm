@@ -1,6 +1,8 @@
 # Calm
 
-**Light that is right on its own.** Pick a room, and Calm lights it when it is dark and somebody is there, gives the light the colour that suits the time of day, and puts it out when the daylight takes over.
+**Light that is right on its own.** Most setups turn a motion sensor into a light switch with daylight as a condition. Calm turns it around: a light switch that watches the daylight, with motion as a condition. Pick a room, and Calm lights it when it is dark and somebody is there, gives the light the colour that suits the time of day, and puts it out when the daylight takes over.
+
+Works with, and tested on, Philips Hue.
 
 [Nederlands](README.nl.md)
 
@@ -64,6 +66,10 @@ PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE).
+
+## How Calm came about
+
+Calm started from [Adaptive Lighting](https://github.com/basnijholt/adaptive-lighting), which showed that lights in Home Assistant can follow the day and step aside when someone takes over by hand. Calm shares no code with it. It asks a different question, how much light the room is missing right now, and answers it from a light sensor instead of the sun's position.
 
 ---
 

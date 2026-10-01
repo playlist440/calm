@@ -1,6 +1,8 @@
 # Calm
 
-**Licht dat vanzelf klopt.** Kies een ruimte, en Calm doet het licht aan als het donker is en er iemand is, geeft het de kleur die bij het moment van de dag hoort, en doet het uit zodra het daglicht het overneemt.
+**Licht dat vanzelf klopt.** De meeste opstellingen maken van een bewegingssensor een lichtschakelaar met licht als voorwaarde. Calm draait dat om: een lichtschakelaar die naar het daglicht kijkt, met beweging als voorwaarde. Kies een ruimte, en Calm doet het licht aan als het donker is en er iemand is, geeft het de kleur die bij het moment van de dag past, en doet het uit als het daglicht het overneemt.
+
+Werkt met, en getest op, Philips Hue.
 
 [English](README.md)
 
@@ -55,6 +57,10 @@ Elke ruimte schrijft een dagverslag naar `config/calm/<ruimte>/`: één regel pe
 ## Licentie
 
 Apache-2.0. Zie [LICENSE](LICENSE).
+
+## Hoe Calm is ontstaan
+
+Calm begon bij [Adaptive Lighting](https://github.com/basnijholt/adaptive-lighting), dat liet zien dat lampen in Home Assistant de dag kunnen volgen en afblijven als iemand ze met de hand bedient. Calm deelt er geen code mee. Het stelt een andere vraag, hoeveel licht de kamer nu tekortkomt, en beantwoordt die met een lichtsensor in plaats van de stand van de zon.
 
 ---
 
