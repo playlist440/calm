@@ -59,6 +59,9 @@ class House:
             suggested_object_id=object_id,
             device_id=device_id,
             original_device_class=device_class,
+            # A name of its own: newer Home Assistant refuses an area on an
+            # entity that only borrows its device's name.
+            original_name=object_id.replace("_", " "),
             disabled_by=er.RegistryEntryDisabler.USER if disabled else None,
         )
         if area is not None:
