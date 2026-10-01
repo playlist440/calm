@@ -55,3 +55,7 @@ Elke ruimte schrijft een dagverslag naar `config/calm/<ruimte>/`: één regel pe
 ## Licentie
 
 Apache-2.0. Zie [LICENSE](LICENSE).
+
+---
+
+*Alleen het idee kwam van mij; Claude is de echte engineer. Elke regel code in deze repository is geschreven door Claude (Anthropic). Ik beschreef wat ik wilde en testte het in mijn eigen huis, maar heb geen komma aan de code toegevoegd.* — playlist440

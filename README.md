@@ -64,3 +64,7 @@ PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE).
+
+---
+
+*The idea is mine; the engineering is Claude's. Every line of code in this repository was written by Claude (Anthropic). I described what I wanted and tested it in my own home, but did not add a single comma to the code.* — playlist440
