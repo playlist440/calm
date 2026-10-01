@@ -1,0 +1,463 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Welke ruimtes laat je door Calm regelen?",
+        "description": "Calm heeft minstens één lamp en een lichtsensor nodig. Een ruimte zonder lichtsensor kun je toch aanvinken; dan kies je er in de volgende stap een.",
+        "data": {
+          "rooms": "Ruimtes"
+        }
+      },
+      "sensor": {
+        "title": "{room} heeft nog geen lichtsensor",
+        "description": "Kies een lichtsensor uit een andere ruimte. Een sensor in de ruimte ernaast werkt goed, en een buitensensor zegt in elk geval wanneer het donker wordt. Laat je hem leeg, dan slaat Calm deze ruimte voorlopig over.",
+        "data": {
+          "light_sensor": "Lichtsensor"
+        }
+      },
+      "when": {
+        "title": "Wanneer mag Calm de lampen aansturen?",
+        "description": "Dit geldt voor alle ruimtes; per ruimte kun je er later van afwijken. Alles wat je hier aanzet moet kloppen.",
+        "data": {
+          "home": "Als er iemand thuis is"
+        },
+        "data_description": {
+          "home": "Volgt de personen in Home Assistant."
+        },
+        "sections": {
+          "condition": {
+            "name": "Als iets aan of uit staat",
+            "description": "Bijvoorbeeld: alleen als je nachtmodus uit staat.",
+            "data": {
+              "entity": "Wat",
+              "entity_state": "Calm mag als het zo staat"
+            },
+            "data_description": {
+              "entity": "Laat leeg als je dit niet gebruikt."
+            }
+          },
+          "hours": {
+            "name": "Alleen tussen vaste tijden",
+            "data": {
+              "window": "Gebruiken",
+              "start": "Van",
+              "end": "Tot"
+            }
+          },
+          "yourself": {
+            "name": "Zelf regelen",
+            "data": {
+              "manual": "Ik regel het zelf met een automatisering"
+            },
+            "data_description": {
+              "manual": "Calm doet dan alleen wat de Calm-schakelaar van de ruimte zegt, en kijkt naar geen van de voorwaarden hierboven."
+            }
+          }
+        }
+      },
+      "rhythm": {
+        "title": "Je dagritme",
+        "description": "Het licht loopt 's ochtends op van warm naar helder en wordt 's avonds warmer en zachter, richting bedtijd.",
+        "data": {
+          "wake": "Opstaan",
+          "bed": "Naar bed"
+        }
+      }
+    },
+    "error": {
+      "choose_one": "Kies minstens één ruimte."
+    },
+    "abort": {
+      "no_rooms": "Er staan nog geen lampen in een ruimte in Home Assistant. Zet je lampen eerst in ruimtes (Instellingen → Ruimtes), dan vindt Calm ze vanzelf.",
+      "single_instance_allowed": "Calm is al geïnstalleerd. Ruimtes voeg je toe onder Calm."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Calm",
+        "menu_options": {
+          "rooms": "Ruimtes",
+          "when": "Wanneer Calm stuurt",
+          "rhythm": "Dagritme"
+        }
+      },
+      "rooms": {
+        "title": "Welke ruimtes laat je door Calm regelen?",
+        "description": "Vink je een ruimte uit, dan stopt Calm daar en vergeet hij de instellingen en overrules van die ruimte.",
+        "data": {
+          "rooms": "Ruimtes"
+        }
+      },
+      "room_sensor": {
+        "title": "{room} heeft nog geen lichtsensor",
+        "description": "Kies een lichtsensor uit een andere ruimte. Laat je hem leeg, dan wordt deze ruimte niet toegevoegd.",
+        "data": {
+          "light_sensor": "Lichtsensor"
+        }
+      },
+      "when": {
+        "title": "Wanneer mag Calm de lampen aansturen?",
+        "data": {
+          "home": "Als er iemand thuis is"
+        },
+        "data_description": {
+          "home": "Volgt de personen in Home Assistant."
+        },
+        "sections": {
+          "condition": {
+            "name": "Als iets aan of uit staat",
+            "description": "Bijvoorbeeld: alleen als je nachtmodus uit staat.",
+            "data": {
+              "entity": "Wat",
+              "entity_state": "Calm mag als het zo staat"
+            },
+            "data_description": {
+              "entity": "Laat leeg als je dit niet gebruikt."
+            }
+          },
+          "hours": {
+            "name": "Alleen tussen vaste tijden",
+            "data": {
+              "window": "Gebruiken",
+              "start": "Van",
+              "end": "Tot"
+            }
+          },
+          "yourself": {
+            "name": "Zelf regelen",
+            "data": {
+              "manual": "Ik regel het zelf met een automatisering"
+            },
+            "data_description": {
+              "manual": "Calm doet dan alleen wat de Calm-schakelaar van de ruimte zegt, en kijkt naar geen van de voorwaarden hierboven."
+            }
+          }
+        }
+      },
+      "rhythm": {
+        "title": "Dagritme",
+        "data": {
+          "wake": "Opstaan",
+          "bed": "Naar bed"
+        },
+        "sections": {
+          "colours": {
+            "name": "Kleuren",
+            "data": {
+              "warm_kelvin": "Warmste kleur",
+              "cool_kelvin": "Koelste kleur"
+            }
+          }
+        }
+      }
+    }
+  },
+  "config_subentries": {
+    "room": {
+      "entry_type": "Ruimte",
+      "initiate_flow": {
+        "user": "Ruimte toevoegen",
+        "reconfigure": "Instellingen"
+      },
+      "step": {
+        "user": {
+          "title": "Ruimte toevoegen",
+          "menu_options": {
+            "area": "Een ruimte uit Home Assistant",
+            "custom": "Zelf samenstellen"
+          }
+        },
+        "area": {
+          "title": "Welke ruimte?",
+          "data": {
+            "area_id": "Ruimte"
+          }
+        },
+        "area_sensor": {
+          "title": "{room} heeft nog geen lichtsensor",
+          "description": "Kies een lichtsensor uit een andere ruimte.",
+          "data": {
+            "light_sensor": "Lichtsensor"
+          }
+        },
+        "custom": {
+          "title": "Zelf een ruimte samenstellen",
+          "description": "Deze ruimte volgt niets in Home Assistant: je kiest de lampen en sensoren zelf.",
+          "data": {
+            "name": "Naam",
+            "lights": "Lampen",
+            "light_sensor": "Lichtsensor",
+            "motion_sensor": "Bewegingssensor"
+          }
+        },
+        "reconfigure": {
+          "title": "Instellingen",
+          "menu_options": {
+            "settings": "Instellingen",
+            "overrides": "Overrules"
+          }
+        },
+        "settings": {
+          "title": "{room}",
+          "sections": {
+            "light": {
+              "name": "Licht",
+              "data": {
+                "threshold_lux": "Lampen aan als het donkerder is dan",
+                "brightness": "Hoe fel overdag",
+                "evening_brightness": "Hoe fel 's avonds"
+              },
+              "data_description": {
+                "threshold_lux": "Staat het daglicht onder deze waarde, dan gaan de lampen aan. Het is de hele dag dezelfde waarde. {reading}",
+                "brightness": "Het hoogste niveau overdag.",
+                "evening_brightness": "Waar het licht in de laatste anderhalf uur voor bedtijd ongemerkt naartoe zakt, nadat het eerst warm is geworden. Nooit feller dan overdag."
+              }
+            },
+            "motion": {
+              "name": "Beweging",
+              "data": {
+                "use_motion": "Alleen licht als er iemand in de ruimte is",
+                "motion_hold_minutes": "Niemand gezien na",
+                "when_empty": "Dan gaan de lampen",
+                "standby_level": "Standby: hoe fel",
+                "standby_kelvin": "Standby: kleur",
+                "motion_always": "Beweging geeft altijd licht",
+                "nightlight_level": "Nachtlampje: hoe fel",
+                "nightlight_kelvin": "Nachtlampje: kleur"
+              },
+              "data_description": {
+                "motion_always": "Ook als Calm uit staat: 's nachts een nachtlampje, overdag gewoon licht."
+              }
+            },
+            "when": {
+              "name": "Wanneer",
+              "data": {
+                "own_when": "Eigen ‘wanneer’ voor deze ruimte"
+              },
+              "data_description": {
+                "own_when": "Uit: deze ruimte volgt Calm → Configureren → Wanneer. Aan: je stelt het in op het volgende scherm."
+              }
+            },
+            "rhythm": {
+              "name": "Dagritme",
+              "data": {
+                "own_rhythm": "Eigen dagritme voor deze ruimte"
+              },
+              "data_description": {
+                "own_rhythm": "Uit: deze ruimte volgt Calm → Configureren → Dagritme. Aan: je stelt het in op het volgende scherm."
+              }
+            },
+            "lamps": {
+              "name": "Lampen en sensoren",
+              "data": {
+                "excluded_lights": "Lampen die normaal niet meedoen",
+                "light_sensor": "Andere lichtsensor",
+                "motion_sensor": "Andere bewegingssensor",
+                "min_level": "Laagste stand van de dimmer",
+                "max_level": "Hoogste stand van de dimmer",
+                "manual_hold_minutes": "Met de hand ingesteld: Calm wacht"
+              },
+              "data_description": {
+                "excluded_lights": "Bijvoorbeeld een werkbladlamp die alleen bij Werklicht hoort.",
+                "light_sensor": "Leeg: de sensor die Calm in de ruimte vond.",
+                "min_level": "Onder deze stand doen de lampen niets meer; de ruimte gaat dan uit in plaats van verder te dimmen.",
+                "manual_hold_minutes": "Zo lang laat Calm de lampen met rust nadat iemand ze zelf heeft ingesteld."
+              }
+            }
+          }
+        },
+        "overrides": {
+          "title": "Overrules",
+          "data": {
+            "override": "Kies er een om aan te passen, of maak een nieuwe"
+          }
+        },
+        "override_new": {
+          "title": "Nieuwe overrule",
+          "description": "Kies een sjabloon. Daarna kies je welke lampen meedoen en pas je de rest aan. De naam wordt de naam van de schakelaar en kan later niet meer veranderen.",
+          "data": {
+            "template": "Sjabloon",
+            "name": "Naam (leeg: de naam van het sjabloon)"
+          }
+        },
+        "override": {
+          "title": "{name}",
+          "data": {
+            "lights": "Lampen die aan zijn",
+            "level_mode": "Helderheid",
+            "level": "Hoeveel",
+            "colour_mode": "Kleur",
+            "mired_shift": "Warmer of koeler",
+            "kelvin": "Vaste kleur",
+            "auto": "Gaat vanzelf aan",
+            "auto_start": "Van",
+            "auto_end": "Tot",
+            "auto_entity": "Als dit apparaat…",
+            "auto_state": "…in deze stand staat",
+            "remove": "Deze overrule verwijderen"
+          },
+          "data_description": {
+            "level": "Ten opzichte van normaal: 100% is gelijk, 200% twee keer zo veel. Als vaste stand: het percentage van de lamp.",
+            "auto_state": "Meestal 'on'. Voor een tv kan 'playing' beter passen.",
+            "remove": "De schakelaar gaat mee, en een automatisering die ernaar wijst werkt daarna niet meer."
+          }
+        },
+        "room_when": {
+          "title": "Wanneer mag Calm de lampen in {room} aansturen?",
+          "data": {
+            "home": "Als er iemand thuis is"
+          },
+          "data_description": {
+            "home": "Volgt de personen in Home Assistant."
+          },
+          "sections": {
+            "condition": {
+              "name": "Als iets aan of uit staat",
+              "description": "Bijvoorbeeld: alleen als je nachtmodus uit staat.",
+              "data": {
+                "entity": "Wat",
+                "entity_state": "Calm mag als het zo staat"
+              },
+              "data_description": {
+                "entity": "Laat leeg als je dit niet gebruikt."
+              }
+            },
+            "hours": {
+              "name": "Alleen tussen vaste tijden",
+              "data": {
+                "window": "Gebruiken",
+                "start": "Van",
+                "end": "Tot"
+              }
+            },
+            "yourself": {
+              "name": "Zelf regelen",
+              "data": {
+                "manual": "Ik regel het zelf met een automatisering"
+              },
+              "data_description": {
+                "manual": "Calm doet dan alleen wat de Calm-schakelaar van de ruimte zegt, en kijkt naar geen van de voorwaarden hierboven."
+              }
+            }
+          },
+          "description": "Alleen voor deze ruimte. Alles wat je hier aanzet moet kloppen."
+        },
+        "room_rhythm": {
+          "title": "Dagritme van {room}",
+          "data": {
+            "wake": "Opstaan",
+            "bed": "Naar bed"
+          },
+          "sections": {
+            "colours": {
+              "name": "Kleuren",
+              "data": {
+                "warm_kelvin": "Warmste kleur",
+                "cool_kelvin": "Koelste kleur"
+              }
+            }
+          }
+        }
+      },
+      "error": {
+        "sensor_needed": "Calm heeft een lichtsensor nodig om te weten wanneer het donker is.",
+        "no_lights": "Kies minstens één lamp.",
+        "name_unusable": "Geef een naam met minstens één letter of cijfer."
+      },
+      "abort": {
+        "no_more_rooms": "Alle ruimtes met lampen doen al mee. Wil je een ruimte die niet in Home Assistant bestaat, kies dan 'Zelf samenstellen'.",
+        "reconfigure_successful": "Opgeslagen."
+      }
+    }
+  },
+  "selector": {
+    "on_off": {
+      "options": {
+        "on": "Aan",
+        "off": "Uit"
+      }
+    },
+    "when_empty": {
+      "options": {
+        "off": "Uit, langzaam uitfaden",
+        "standby": "Naar standby"
+      }
+    },
+    "level_mode": {
+      "options": {
+        "relative": "Ten opzichte van normaal",
+        "fixed": "Vaste stand"
+      }
+    },
+    "colour_mode": {
+      "options": {
+        "follow": "Volgt het dagritme",
+        "shift": "Warmer of koeler dan normaal",
+        "fixed": "Vaste kleur"
+      }
+    },
+    "auto": {
+      "options": {
+        "none": "Nee, alleen met de schakelaar",
+        "time": "Op vaste tijden",
+        "entity": "Als een apparaat aangaat"
+      }
+    }
+  },
+  "entity": {
+    "switch": {
+      "calm": {
+        "name": "Calm"
+      },
+      "override": {
+        "name": "{name}"
+      }
+    },
+    "number": {
+      "threshold": {
+        "name": "Lampen aan als het donkerder is dan"
+      },
+      "brightness": {
+        "name": "Hoe fel overdag"
+      },
+      "evening_brightness": {
+        "name": "Hoe fel 's avonds"
+      }
+    },
+    "sensor": {
+      "why": {
+        "name": "Waarom"
+      },
+      "daylight": {
+        "name": "Daglicht"
+      },
+      "target": {
+        "name": "Doel"
+      },
+      "colour_temperature": {
+        "name": "Kleurtemperatuur"
+      },
+      "confidence": {
+        "name": "Betrouwbaarheid"
+      },
+      "lamp_contribution": {
+        "name": "Lampbijdrage"
+      },
+      "commands_sent": {
+        "name": "Verstuurde commando's"
+      }
+    },
+    "button": {
+      "resume": {
+        "name": "Neem het weer over"
+      }
+    }
+  },
+  "issues": {
+    "condition_missing": {
+      "title": "Calm kijkt naar iets dat niet meer bestaat",
+      "description": "Calm stuurt de lampen alleen aan als {entity} in de gekozen stand staat, maar die entiteit bestaat niet meer. Daardoor blijven de lampen uit.\n\nKies een andere via Instellingen → Apparaten en diensten → Calm → Configureren → Wanneer, of bij de ruimte zelf als die een eigen ‘wanneer’ heeft."
+    }
+  }
+}

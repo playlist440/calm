@@ -1,0 +1,463 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Which rooms should Calm look after?",
+        "description": "Calm needs at least one lamp and a light sensor. You can still tick a room without a light sensor; you pick one in the next step.",
+        "data": {
+          "rooms": "Rooms"
+        }
+      },
+      "sensor": {
+        "title": "{room} has no light sensor yet",
+        "description": "Pick a light sensor from another room. One in the room next door works well, and an outdoor sensor at least knows when it gets dark. Leave it empty and Calm skips this room for now.",
+        "data": {
+          "light_sensor": "Light sensor"
+        }
+      },
+      "when": {
+        "title": "When may Calm run the lamps?",
+        "description": "This applies to every room; you can change it per room later. Everything you switch on here has to hold.",
+        "data": {
+          "home": "When somebody is home"
+        },
+        "data_description": {
+          "home": "Follows the people in Home Assistant."
+        },
+        "sections": {
+          "condition": {
+            "name": "When something is on or off",
+            "description": "For example: only while night mode is off.",
+            "data": {
+              "entity": "What",
+              "entity_state": "Calm may run when it is"
+            },
+            "data_description": {
+              "entity": "Leave empty if you do not use this."
+            }
+          },
+          "hours": {
+            "name": "Only between set hours",
+            "data": {
+              "window": "Use",
+              "start": "From",
+              "end": "Until"
+            }
+          },
+          "yourself": {
+            "name": "Run it yourself",
+            "data": {
+              "manual": "I run it myself with an automation"
+            },
+            "data_description": {
+              "manual": "Calm then only does what the room's Calm switch says, and looks at none of the conditions above."
+            }
+          }
+        }
+      },
+      "rhythm": {
+        "title": "Your day",
+        "description": "In the morning the light rises from warm to bright, and in the evening it grows warmer and softer towards bedtime.",
+        "data": {
+          "wake": "Getting up",
+          "bed": "Bedtime"
+        }
+      }
+    },
+    "error": {
+      "choose_one": "Choose at least one room."
+    },
+    "abort": {
+      "no_rooms": "No lamps are in a room in Home Assistant yet. Put your lamps in areas first (Settings → Areas), and Calm finds them by itself.",
+      "single_instance_allowed": "Calm is already installed. Add rooms under Calm."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Calm",
+        "menu_options": {
+          "rooms": "Rooms",
+          "when": "When Calm runs",
+          "rhythm": "Your day"
+        }
+      },
+      "rooms": {
+        "title": "Which rooms should Calm look after?",
+        "description": "Untick a room and Calm stops there, and forgets that room's settings and overrides.",
+        "data": {
+          "rooms": "Rooms"
+        }
+      },
+      "room_sensor": {
+        "title": "{room} has no light sensor yet",
+        "description": "Pick a light sensor from another room. Leave it empty and this room is not added.",
+        "data": {
+          "light_sensor": "Light sensor"
+        }
+      },
+      "when": {
+        "title": "When may Calm run the lamps?",
+        "data": {
+          "home": "When somebody is home"
+        },
+        "data_description": {
+          "home": "Follows the people in Home Assistant."
+        },
+        "sections": {
+          "condition": {
+            "name": "When something is on or off",
+            "description": "For example: only while night mode is off.",
+            "data": {
+              "entity": "What",
+              "entity_state": "Calm may run when it is"
+            },
+            "data_description": {
+              "entity": "Leave empty if you do not use this."
+            }
+          },
+          "hours": {
+            "name": "Only between set hours",
+            "data": {
+              "window": "Use",
+              "start": "From",
+              "end": "Until"
+            }
+          },
+          "yourself": {
+            "name": "Run it yourself",
+            "data": {
+              "manual": "I run it myself with an automation"
+            },
+            "data_description": {
+              "manual": "Calm then only does what the room's Calm switch says, and looks at none of the conditions above."
+            }
+          }
+        }
+      },
+      "rhythm": {
+        "title": "Your day",
+        "data": {
+          "wake": "Getting up",
+          "bed": "Bedtime"
+        },
+        "sections": {
+          "colours": {
+            "name": "Colours",
+            "data": {
+              "warm_kelvin": "Warmest colour",
+              "cool_kelvin": "Coolest colour"
+            }
+          }
+        }
+      }
+    }
+  },
+  "config_subentries": {
+    "room": {
+      "entry_type": "Room",
+      "initiate_flow": {
+        "user": "Add room",
+        "reconfigure": "Settings"
+      },
+      "step": {
+        "user": {
+          "title": "Add a room",
+          "menu_options": {
+            "area": "A room from Home Assistant",
+            "custom": "Put one together"
+          }
+        },
+        "area": {
+          "title": "Which room?",
+          "data": {
+            "area_id": "Room"
+          }
+        },
+        "area_sensor": {
+          "title": "{room} has no light sensor yet",
+          "description": "Pick a light sensor from another room.",
+          "data": {
+            "light_sensor": "Light sensor"
+          }
+        },
+        "custom": {
+          "title": "Put a room together",
+          "description": "This room follows nothing in Home Assistant: you choose the lamps and sensors yourself.",
+          "data": {
+            "name": "Name",
+            "lights": "Lamps",
+            "light_sensor": "Light sensor",
+            "motion_sensor": "Motion sensor"
+          }
+        },
+        "reconfigure": {
+          "title": "Settings",
+          "menu_options": {
+            "settings": "Settings",
+            "overrides": "Overrides"
+          }
+        },
+        "settings": {
+          "title": "{room}",
+          "sections": {
+            "light": {
+              "name": "Light",
+              "data": {
+                "threshold_lux": "Lights on when darker than",
+                "brightness": "How bright by day",
+                "evening_brightness": "How bright in the evening"
+              },
+              "data_description": {
+                "threshold_lux": "When the daylight is below this, the lamps come on. It is the same all day. {reading}",
+                "brightness": "The highest level during the day.",
+                "evening_brightness": "Where the light sinks to, unseen, in the last hour and a half before bed, after it has turned warm first. Never brighter than by day."
+              }
+            },
+            "motion": {
+              "name": "Motion",
+              "data": {
+                "use_motion": "Only light when somebody is in the room",
+                "motion_hold_minutes": "Nobody seen for",
+                "when_empty": "Then the lamps",
+                "standby_level": "Standby: how bright",
+                "standby_kelvin": "Standby: colour",
+                "motion_always": "Movement always gives light",
+                "nightlight_level": "Nightlight: how bright",
+                "nightlight_kelvin": "Nightlight: colour"
+              },
+              "data_description": {
+                "motion_always": "Even when Calm is off: a nightlight at night, ordinary light during the day."
+              }
+            },
+            "when": {
+              "name": "When",
+              "data": {
+                "own_when": "Own ‘when’ for this room"
+              },
+              "data_description": {
+                "own_when": "Off: this room follows Calm → Configure → When. On: you set it on the next screen."
+              }
+            },
+            "rhythm": {
+              "name": "Rhythm",
+              "data": {
+                "own_rhythm": "Own rhythm for this room"
+              },
+              "data_description": {
+                "own_rhythm": "Off: this room follows Calm → Configure → Rhythm. On: you set it on the next screen."
+              }
+            },
+            "lamps": {
+              "name": "Lamps and sensors",
+              "data": {
+                "excluded_lights": "Lamps that normally sit out",
+                "light_sensor": "Different light sensor",
+                "motion_sensor": "Different motion sensor",
+                "min_level": "Lowest dimmer setting",
+                "max_level": "Highest dimmer setting",
+                "manual_hold_minutes": "Set by hand: Calm waits"
+              },
+              "data_description": {
+                "excluded_lights": "A worktop light that only belongs to a work light, for example.",
+                "light_sensor": "Empty: the sensor Calm found in the room.",
+                "min_level": "Below this the lamps do nothing; the room goes off rather than dimming further.",
+                "manual_hold_minutes": "How long Calm leaves the lamps alone after somebody sets them by hand."
+              }
+            }
+          }
+        },
+        "overrides": {
+          "title": "Overrides",
+          "data": {
+            "override": "Pick one to change, or make a new one"
+          }
+        },
+        "override_new": {
+          "title": "New override",
+          "description": "Pick a template. Then choose which lamps take part and adjust the rest. The name becomes the switch's name and cannot change later.",
+          "data": {
+            "template": "Template",
+            "name": "Name (empty: the template's name)"
+          }
+        },
+        "override": {
+          "title": "{name}",
+          "data": {
+            "lights": "Lamps that are on",
+            "level_mode": "Brightness",
+            "level": "How much",
+            "colour_mode": "Colour",
+            "mired_shift": "Warmer or cooler",
+            "kelvin": "Fixed colour",
+            "auto": "Switches itself on",
+            "auto_start": "From",
+            "auto_end": "Until",
+            "auto_entity": "When this device…",
+            "auto_state": "…is in this state",
+            "remove": "Remove this override"
+          },
+          "data_description": {
+            "level": "Relative to normal: 100% is the same, 200% twice as much. As a set level: the lamp's percentage.",
+            "auto_state": "Usually 'on'. For a TV, 'playing' may fit better.",
+            "remove": "The switch goes too, and an automation pointing at it stops working."
+          }
+        },
+        "room_when": {
+          "title": "When may Calm run the lamps in {room}?",
+          "data": {
+            "home": "When somebody is home"
+          },
+          "data_description": {
+            "home": "Follows the people in Home Assistant."
+          },
+          "sections": {
+            "condition": {
+              "name": "When something is on or off",
+              "description": "For example: only while night mode is off.",
+              "data": {
+                "entity": "What",
+                "entity_state": "Calm may run when it is"
+              },
+              "data_description": {
+                "entity": "Leave empty if you do not use this."
+              }
+            },
+            "hours": {
+              "name": "Only between set hours",
+              "data": {
+                "window": "Use",
+                "start": "From",
+                "end": "Until"
+              }
+            },
+            "yourself": {
+              "name": "Run it yourself",
+              "data": {
+                "manual": "I run it myself with an automation"
+              },
+              "data_description": {
+                "manual": "Calm then only does what the room's Calm switch says, and looks at none of the conditions above."
+              }
+            }
+          },
+          "description": "For this room only. Everything you switch on here has to hold."
+        },
+        "room_rhythm": {
+          "title": "Rhythm for {room}",
+          "data": {
+            "wake": "Getting up",
+            "bed": "Bedtime"
+          },
+          "sections": {
+            "colours": {
+              "name": "Colours",
+              "data": {
+                "warm_kelvin": "Warmest colour",
+                "cool_kelvin": "Coolest colour"
+              }
+            }
+          }
+        }
+      },
+      "error": {
+        "sensor_needed": "Calm needs a light sensor to know when it is dark.",
+        "no_lights": "Choose at least one lamp.",
+        "name_unusable": "Give a name with at least one letter or digit."
+      },
+      "abort": {
+        "no_more_rooms": "Every room with lamps is already in. For a room that does not exist in Home Assistant, choose 'Put one together'.",
+        "reconfigure_successful": "Saved."
+      }
+    }
+  },
+  "selector": {
+    "on_off": {
+      "options": {
+        "on": "On",
+        "off": "Off"
+      }
+    },
+    "when_empty": {
+      "options": {
+        "off": "Off, fading out slowly",
+        "standby": "To standby"
+      }
+    },
+    "level_mode": {
+      "options": {
+        "relative": "Relative to normal",
+        "fixed": "Set level"
+      }
+    },
+    "colour_mode": {
+      "options": {
+        "follow": "Follows the day",
+        "shift": "Warmer or cooler than normal",
+        "fixed": "Fixed colour"
+      }
+    },
+    "auto": {
+      "options": {
+        "none": "No, only with its switch",
+        "time": "At set times",
+        "entity": "When a device comes on"
+      }
+    }
+  },
+  "entity": {
+    "switch": {
+      "calm": {
+        "name": "Calm"
+      },
+      "override": {
+        "name": "{name}"
+      }
+    },
+    "number": {
+      "threshold": {
+        "name": "Lights on when darker than"
+      },
+      "brightness": {
+        "name": "How bright by day"
+      },
+      "evening_brightness": {
+        "name": "How bright in the evening"
+      }
+    },
+    "sensor": {
+      "why": {
+        "name": "Why"
+      },
+      "daylight": {
+        "name": "Daylight"
+      },
+      "target": {
+        "name": "Target"
+      },
+      "colour_temperature": {
+        "name": "Colour temperature"
+      },
+      "confidence": {
+        "name": "Confidence"
+      },
+      "lamp_contribution": {
+        "name": "Lamp contribution"
+      },
+      "commands_sent": {
+        "name": "Commands sent"
+      }
+    },
+    "button": {
+      "resume": {
+        "name": "Take over again"
+      }
+    }
+  },
+  "issues": {
+    "condition_missing": {
+      "title": "Calm is watching something that no longer exists",
+      "description": "Calm only runs the lamps when {entity} is in the chosen state, but that entity no longer exists, so the lamps stay off.\n\nChoose another under Settings → Devices & services → Calm → Configure → When, or in the room itself if it has its own ‘when’."
+    }
+  }
+}
