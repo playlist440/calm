@@ -109,8 +109,10 @@ class ControllerConfig:
     #: than it adapts to a change in level, so this can be quicker than it
     #: looks. Set so the evening wind-down fits inside its three hours.
     mired_slew_per_minute: float = 8.0
-    #: Multiplier on both limits while somebody is moving about: a change is
-    #: least noticeable when something else just happened.
+    #: Multiplier on the brightness limit while somebody is moving about: a
+    #: change in level is least noticeable when something else just happened.
+    #: Not on colour: 6 October, the bathroom's colour visibly sped up each
+    #: time somebody walked past the sensor.
     motion_allowance: float = 4.0
     #: And during the wake-up ramp, which is the one change meant to be seen.
     morning_allowance: float = 6.0
@@ -817,7 +819,13 @@ class RoomController:
         self.master = self.brightness_limiter.step(
             self.master, proposed, dt_seconds, allowance
         )
-        self.mired = self._slew_colour(mired, dt_seconds, allowance)
+        colour_allowance = cfg.morning_allowance if self.day_curve.in_morning_ramp(self._now) else 1.0
+        if want.scene is Scene.ADAPTIVE and self.mired is not None and self.day_curve.in_evening(self._now):
+            # Once the evening has begun the colour only goes warmer. 6 October,
+            # 20:25: the bathroom went from dim to full, the comfort cap that
+            # had held it warm let go, and it walked cooler all evening.
+            mired = max(mired, self.mired)
+        self.mired = self._slew_colour(mired, dt_seconds, colour_allowance)
         return self._command(Action.APPLY, targets, daylight, want, want.reason)
 
     def _slew_colour(self, wanted: float, dt_seconds: float, allowance: float) -> float:

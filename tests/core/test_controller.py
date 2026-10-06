@@ -294,6 +294,37 @@ def test_a_restart_carries_on_from_where_the_lamps_are():
     assert c.master == pytest.approx(0.6, abs=0.02)
 
 
+def test_walking_past_does_not_hurry_the_colour():
+    """6 October, the bathroom: each time somebody walked past the sensor
+    the colour visibly sped up."""
+    still = kitchen(use_motion=False)
+    moving = kitchen(use_motion=False)
+    for c in (still, moving):
+        c.set_enabled(True)
+    a, b = Clock(still, at(30, 6, 0)), Clock(moving, at(30, 6, 0))
+    a.run(10, lux=2.0)
+    b.run(10, lux=2.0)
+    a.now = b.now = at(30, 14, 0)
+    for _ in range(20):
+        b.move(True)
+        a.tick(2.0)
+        b.tick(2.0)
+    assert abs(moving.mired - still.mired) < 1e-6, "beweging versnelde de kleur"
+
+
+def test_in_the_evening_the_colour_only_gets_warmer():
+    """6 October, 20:25: dim to full in the bathroom, and the colour walked
+    from 2280 K up to 2930 K over the next ten minutes."""
+    c = room(brightness=1.0)
+    c.set_enabled(True)
+    clock = Clock(c, at(30, 21, 30))
+    clock.run(2, lux=1.0)
+    c.mired = 1_000_000.0 / 2280.0
+    start = c.mired
+    clock.run(15, lux=1.0)
+    assert c.mired >= start - 1e-9, "'s avonds werd het licht koeler"
+
+
 def test_the_evening_is_never_brighter_than_the_day():
     c = room(brightness=0.5, evening_brightness=0.9)
     c.set_enabled(True)

@@ -302,6 +302,14 @@ class DayCurve:
         rising = _smoothstep(since_wake / max(cfg.morning_rise_hours, 1e-6))
         return min(rising, falling)
 
+    def in_evening(self, now: datetime) -> bool:
+        """From the start of the wind-down until waking: the stretch in which
+        the colour may only get warmer."""
+        cfg = self.config
+        day_length = _hours_between(cfg.wake, cfg.bed)
+        since_wake = _hours_between(cfg.wake, now.time())
+        return day_length - since_wake <= cfg.evening_ramp_hours
+
     def in_morning_ramp(self, now: datetime) -> bool:
         """Whether the wake-up ramp is running.
 
