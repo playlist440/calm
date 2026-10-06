@@ -594,7 +594,7 @@ class CalmRoom:
         if self._held is None:
             return None
         started = self._started or now
-        if not self._lamps_known() and now - started < LAMPS_WAIT:
+        if (not self._lamps_known() or self._conditions_unsettled(now)) and now - started < LAMPS_WAIT:
             return None
         self._seeded = True
         self._follow_conditions(now)
@@ -602,6 +602,19 @@ class CalmRoom:
             self.controller.assume_lit(*burning)
         held, self._held = self._held, None
         return held
+
+    def _conditions_unsettled(self, now: datetime) -> bool:
+        """Whether a condition is still waking up with Home Assistant.
+
+        6 October, 20:42: night mode was still unavailable as the bathroom
+        started, so Calm could not take over its burning lamps, and when it
+        was allowed a few seconds later it put them to its own colour in one
+        step.
+        """
+        if self.when.manual:
+            return False
+        failing, _ = self.when.check(self.hass, now, self.language)
+        return failing in ("entity_unavailable", "entity_missing")
 
     def _lamps_known(self) -> bool:
         return any(

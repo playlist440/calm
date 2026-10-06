@@ -333,7 +333,7 @@ async def test_switched_on_by_hand_in_night_mode_goes_out_when_everybody_leaves(
     assert hass.states.get(switch).state == "off", "iedereen weg, en Calm bleef aan"
 
 
-async def test_a_condition_that_no_longer_exists_is_put_under_repairs(hass, kitchen) -> None:
+async def test_a_condition_that_no_longer_exists_is_put_under_repairs(hass, kitchen, freezer) -> None:
     await amsterdam(hass)
     home(hass)
     hass.states.async_set("sensor.nachtmodus_actief", "unavailable",
@@ -344,6 +344,12 @@ async def test_a_condition_that_no_longer_exists_is_put_under_repairs(hass, kitc
     issues = ir.async_get(hass)
     issue = issues.async_get_issue(DOMAIN, "condition_missing_sensor.nachtmodus_actief")
     assert issue is not None, "niemand hoort dat de voorwaarde niet meer bestaat"
+    # At a start a condition still loading looks the same, so the room first
+    # waits up to two minutes for it before it says why it stays dark.
+    for _ in range(5):
+        freezer.tick(timedelta(seconds=30))
+        async_fire_time_changed(hass)
+        await hass.async_block_till_done()
     why = hass.states.get(entity(hass, entry, "sensor", "why")).state
     assert "sensor.nachtmodus_actief" in why
 
@@ -445,3 +451,24 @@ async def test_the_evening_slider_applies_at_once_and_is_kept(hass, kitchen, fre
     assert hub.rooms[next(iter(entry.subentries))] is room, "de schuif herstartte de ruimte"
     assert room.controller.settings.evening_brightness == pytest.approx(0.45)
     assert next(iter(entry.subentries.values())).data["evening_brightness"] == 45
+
+
+async def test_burning_lamps_are_taken_over_once_night_mode_has_woken_up(hass, kitchen, freezer, lamp_calls) -> None:
+    """6 October, 20:42: night mode was still unavailable as Home Assistant
+    started, so the bathroom could not take over its burning lamps, and a
+    few seconds later it put them to its own colour in one step."""
+    await amsterdam(hass)
+    home(hass)
+    hass.states.async_set("binary_sensor.nachtmodus_actief", "unavailable")
+    for lamp in kitchen["lamps"]:
+        hass.states.async_set(lamp, "on", {"brightness": 250, "color_temp_kelvin": 2840,
+                                           "supported_color_modes": ["color_temp"]})
+    hass.states.async_set(kitchen["room_lux"], "2")
+    entry = await start(hass, kitchen, options={"when": {
+        "home": True, "entity": "binary_sensor.nachtmodus_actief", "entity_state": "off"}})
+    room = entry.runtime_data.rooms[next(iter(entry.subentries))]
+    hass.states.async_set("binary_sensor.nachtmodus_actief", "off")
+    await hass.async_block_till_done()
+    assert room.controller.lit
+    assert room.controller.last_command.action.value != "turn_on", "de lampen werden opnieuw aangezet in plaats van overgenomen"
+    assert abs(1_000_000.0 / room.controller.mired - 2840) < 30, "de kleur sprong bij het overnemen"
