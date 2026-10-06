@@ -472,3 +472,17 @@ async def test_burning_lamps_are_taken_over_once_night_mode_has_woken_up(hass, k
     assert room.controller.lit
     assert room.controller.last_command.action.value != "turn_on", "de lampen werden opnieuw aangezet in plaats van overgenomen"
     assert abs(1_000_000.0 / room.controller.mired - 2840) < 30, "de kleur sprong bij het overnemen"
+
+
+async def test_a_lamp_reporting_xy_is_taken_over_at_its_own_colour(hass, kitchen, lamp_calls) -> None:
+    await amsterdam(hass)
+    home(hass)
+    for lamp in kitchen["lamps"]:
+        # 2300 K, as xy: what a lamp reports when its colour came from a scene.
+        hass.states.async_set(lamp, "on", {"brightness": 250, "xy_color": [0.4927, 0.4148],
+                                           "supported_color_modes": ["color_temp"]})
+    hass.states.async_set(kitchen["room_lux"], "2")
+    entry = await start(hass, kitchen)
+    room = entry.runtime_data.rooms[next(iter(entry.subentries))]
+    assert room.controller.lit
+    assert abs(1_000_000.0 / room.controller.mired - 2300) < 150

@@ -600,6 +600,9 @@ class CalmRoom:
         self._follow_conditions(now)
         if self.controller.enabled and (burning := self._burning()) is not None:
             self.controller.assume_lit(*burning)
+            master, mired = burning
+            _LOGGER.info("%s: brandende lampen overgenomen op %.0f%%, %s", self.name, master * 100,
+                         "%.0f K" % (1_000_000.0 / mired) if mired else "kleur onbekend")
         held, self._held = self._held, None
         return held
 
@@ -633,7 +636,8 @@ class CalmRoom:
             device = state.attributes.get(ATTR_BRIGHTNESS)
             if device:
                 levels.append(device_to_perceptual(int(device)) / lamp.weight)
-            if kelvin := state.attributes.get(ATTR_COLOR_TEMP_KELVIN):
+            kelvin = state.attributes.get(ATTR_COLOR_TEMP_KELVIN) or _kelvin_from_xy(state.attributes.get("xy_color"))
+            if kelvin:
                 mireds.append(1_000_000.0 / float(kelvin))
         if not levels:
             return None
@@ -723,4 +727,18 @@ class CalmRoom:
 
 def _missing_issue_id(entity_id: str) -> str:
     return f"condition_missing_{entity_id}"
+
+
+def _kelvin_from_xy(xy) -> Optional[float]:
+    """Colour temperature from a lamp's xy colour (McCamy), for lamps that
+    report their colour as xy rather than as a temperature."""
+    try:
+        x, y = float(xy[0]), float(xy[1])
+    except (TypeError, ValueError, IndexError):
+        return None
+    if y == 0.1858:
+        return None
+    n = (x - 0.3320) / (0.1858 - y)
+    kelvin = 449.0 * n ** 3 + 3525.0 * n ** 2 + 6823.3 * n + 5520.33
+    return kelvin if 1000.0 <= kelvin <= 10000.0 else None
 
