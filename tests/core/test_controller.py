@@ -327,15 +327,18 @@ def test_in_the_evening_the_colour_only_gets_warmer():
 
 def test_walking_in_never_dims_below_standby():
     """8 October, 20:15: walking onto the landing took it from its standby
-    10% down to 4%."""
+    10% down to 4%. The light of the standby lamps had been taken for
+    daylight, so the room believed it needed next to nothing. However the
+    estimate falls, somebody in the room never gets less than the empty
+    room did."""
     c = kitchen(standby_level=0.10)
     c.set_enabled(True)
     clock = Clock(c, at(30, 20, 0))
     settled_empty(clock, 2.0)
-    assert c.master == pytest.approx(0.10, abs=0.01)
+    c._desired_master = lambda targets, daylight: 0.0  # the estimate gone wrong
     clock.move(True)
     clock.tick(2.0)
-    clock.run(2, lux=20.0)
+    clock.run(2, lux=2.0)
     assert c.master >= 0.10 - 1e-9, "binnenlopen maakte het donkerder dan standby"
 
 
