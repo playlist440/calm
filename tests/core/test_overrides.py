@@ -59,7 +59,7 @@ def test_what_is_left_is_not_promoted():
         Lamp(id="main", weight=1.0), Lamp(id="accent", weight=0.33),
     ])
     film = Override(key="film", name="Film", lamps={"main": LampRole.OFF})
-    accent = next(l for l in film.profile_from(base).lamps if l.id == "accent")
+    accent = next(lamp for lamp in film.profile_from(base).lamps if lamp.id == "accent")
     assert accent.weight == pytest.approx(0.33)
 
 

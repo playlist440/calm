@@ -29,17 +29,16 @@ from __future__ import annotations
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Deque, Dict, Optional
 
 
 @dataclass
 class Expectation:
     """What we asked for, and how long the lamps have to get there."""
 
-    brightness: Dict[str, int]
+    brightness: dict[str, int]
     mired: float
     until: datetime
-    issued_at: Optional[datetime] = None
+    issued_at: datetime | None = None
 
 
 @dataclass
@@ -57,15 +56,13 @@ class ChangeAttributor:
     #: a set keeps whichever ids it feels like, which quietly throws away
     #: the newest — exactly the ones still in flight.
     remembered_contexts: int = 64
-    #: How long an earlier command still explains a report. Two spots on one
-    #: landing reported ten to thirty seconds apart, and a report of the
-    #: previous command arriving after the next one was sent read as a hand
-    #: (Overloop, 7 and 8 October: ten false takeovers in two days).
+    #: How long an earlier command still explains a report. Lamps report late
+    #: and out of order: a report of the command before last is still ours.
     recent_s: float = 300.0
 
-    _contexts: Deque[str] = field(default_factory=lambda: deque(maxlen=64))
-    _expectation: Optional[Expectation] = None
-    _recent: Deque[Expectation] = field(default_factory=lambda: deque(maxlen=32))
+    _contexts: deque[str] = field(default_factory=lambda: deque(maxlen=64))
+    _expectation: Expectation | None = None
+    _recent: deque[Expectation] = field(default_factory=lambda: deque(maxlen=32))
 
     def issued(self, context_id: str) -> None:
         """Note a context id we are about to send a command under."""
@@ -74,7 +71,7 @@ class ChangeAttributor:
     def expect(
         self,
         when: datetime,
-        brightness: Dict[str, int],
+        brightness: dict[str, int],
         mired: float,
         transition_s: float,
     ) -> None:
@@ -97,9 +94,9 @@ class ChangeAttributor:
         self,
         when: datetime,
         entity_id: str,
-        brightness: Optional[int],
-        mired: Optional[float],
-        context_id: Optional[str] = None,
+        brightness: int | None,
+        mired: float | None,
+        context_id: str | None = None,
     ) -> bool:
         if context_id is not None and context_id in self._contexts:
             return True

@@ -25,7 +25,8 @@ from .controller import (
 from .daycurve import DayCurve, DayCurveConfig, Targets
 from .estimator import ContributionEstimator, EstimatorConfig
 from .explain import Explanation, Why, explain
-from .journal import COLUMNS as JOURNAL_COLUMNS, row as journal_row
+from .journal import COLUMNS as JOURNAL_COLUMNS
+from .journal import row as journal_row
 from .labels import label_lamps
 from .limiter import SlewLimiter
 from .mapping import DaylightResponse
@@ -57,55 +58,55 @@ from .sensorprofile import SensorProfile, SensorWatcher, Speed, suggested_filter
 from .sun import solar_elevation
 
 
-def journal_columns():
+def journal_columns() -> list[str]:
     """The header of a room's own day file."""
     return list(JOURNAL_COLUMNS)
 
 
 __all__ = [
+    "DEFAULT_HOLD_S",
+    "JOURNAL_COLUMNS",
+    "TEMPLATES",
     "Action",
     "AutoMode",
+    "ChangeAttributor",
     "ColourMode",
     "Command",
-    "ControllerConfig",
-    "EmptyAction",
-    "Explanation",
-    "LampRole",
-    "LevelMode",
-    "Override",
-    "OverrideSet",
-    "RoomController",
-    "RoomSettings",
-    "Rung",
-    "Scene",
-    "Source",
-    "TEMPLATES",
-    "Why",
-    "explain",
-    "from_template",
-    "ChangeAttributor",
     "CommandPacer",
     "ContributionEstimator",
-    "DEFAULT_HOLD_S",
+    "ControllerConfig",
     "DayCurve",
     "DayCurveConfig",
     "DaylightResponse",
     "DimProfile",
     "Emission",
+    "EmptyAction",
     "EstimatorConfig",
     "Expectation",
+    "Explanation",
     "FilterReading",
-    "JOURNAL_COLUMNS",
     "Lamp",
     "LampGroup",
+    "LampRole",
+    "LevelMode",
+    "Override",
+    "OverrideSet",
     "PresenceHold",
+    "RoomController",
+    "RoomSettings",
+    "Rung",
+    "Scene",
     "SensorFilter",
     "SensorProfile",
     "SensorWatcher",
     "SlewLimiter",
+    "Source",
     "Speed",
     "Targets",
+    "Why",
     "device_to_perceptual",
+    "explain",
+    "from_template",
     "journal_columns",
     "journal_row",
     "kelvin_to_mired",

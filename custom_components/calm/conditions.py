@@ -13,9 +13,10 @@ automations keeps them.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, time
-from typing import Any, List, Mapping, Optional, Tuple
+from typing import Any
 
 from homeassistant.const import ATTR_RESTORED, STATE_ON, STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
@@ -67,7 +68,7 @@ class When:
     """The conditions one room runs under."""
 
     home: bool = True
-    entity: Optional[str] = None
+    entity: str | None = None
     #: The state ``entity`` has to be in: "on" or "off".
     entity_state: str = "off"
     window: bool = False
@@ -77,7 +78,7 @@ class When:
     manual: bool = False
 
     @classmethod
-    def from_dict(cls, data: Optional[Mapping[str, Any]]) -> "When":
+    def from_dict(cls, data: Mapping[str, Any] | None) -> When:
         data = data or {}
         return cls(
             home=bool(data.get(CONF_HOME, True)),
@@ -89,7 +90,7 @@ class When:
             manual=bool(data.get(CONF_MANUAL, False)),
         )
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             CONF_HOME: self.home,
             CONF_ENTITY: self.entity,
@@ -100,7 +101,7 @@ class When:
             CONF_MANUAL: self.manual,
         }
 
-    def watched(self) -> List[str]:
+    def watched(self) -> list[str]:
         """Entities whose changes mean asking again."""
         if self.manual:
             return []
@@ -113,7 +114,7 @@ class When:
 
     def evaluate(
         self, hass: HomeAssistant, now: datetime, language: str = "nl"
-    ) -> Tuple[bool, Optional[str]]:
+    ) -> tuple[bool, str | None]:
         """Whether Calm may run the room, and if not, why not in a few words.
 
         Only meaningful when ``manual`` is off; with it on the answer comes
@@ -124,7 +125,7 @@ class When:
 
     def check(
         self, hass: HomeAssistant, now: datetime, language: str = "nl"
-    ) -> Tuple[Optional[str], Optional[str]]:
+    ) -> tuple[str | None, str | None]:
         """Which condition fails, if any, and the words for it.
 
         The first is what a room compares from one moment to the next: a
@@ -140,6 +141,7 @@ class When:
                 # By its id: the name it had may now belong to another entity,
                 # which is how the wrong one got picked.
                 return "entity_missing", words["entity_missing"].format(name=self.entity)
+            assert state is not None
             if state.state == STATE_UNAVAILABLE:
                 return "entity_unavailable", words["entity_unavailable"].format(name=state.name)
             if state.state != self.entity_state:
@@ -190,7 +192,7 @@ def _within(now: time, start: time, end: time) -> bool:
     return now >= start or now < end
 
 
-def _time(value, default: time) -> time:
+def _time(value: Any, default: time) -> time:
     if isinstance(value, time):
         return value
     try:

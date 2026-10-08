@@ -74,7 +74,7 @@ def test_a_whole_cloudy_day_never_drifts_faster_than_the_limit():
                     enabled=lambda now: True)
     cfg = controller.config
     ordinary = 0
-    for before, row in zip(trace.rows, trace.rows[1:]):
+    for before, row in zip(trace.rows, trace.rows[1:], strict=False):
         if not (before.lit and row.lit and row.action == "apply"):
             continue
         if row.transition_s != cfg.interval_s:
@@ -86,7 +86,7 @@ def test_a_whole_cloudy_day_never_drifts_faster_than_the_limit():
         down = cfg.slew_down_per_minute * 0.5 * allowance
         change = row.master - before.master
         assert -down - 1e-9 <= change <= up + 1e-9, (
-            "om %s bewoog het licht %.3f in één tik" % (row.when.strftime("%H:%M"), change)
+            "om {} bewoog het licht {:.3f} in één tik".format(row.when.strftime("%H:%M"), change)
         )
     assert ordinary > 100, "de dag bevatte nauwelijks gewone stappen; de test meet niets"
 
@@ -116,7 +116,7 @@ def test_a_cloudy_afternoon_is_not_a_light_switch():
             step = (before[1].when - before[0].when).total_seconds() / 60.0
             dark = sum(step for row in before if row.daylight_lux < threshold)
             assert dark >= 8.0, (
-                "om %s gingen de lampen aan na %.1f minuut echte donkerte" % (
+                "om {} gingen de lampen aan na {:.1f} minuut echte donkerte".format(
                     on.when.strftime("%H:%M"), dark)
             )
             total += 1
@@ -133,17 +133,13 @@ def test_dusk_is_answered_without_anybody_asking():
     evening = trace.between(DAY.replace(hour=15), DAY.replace(hour=22))
     below_from = None
     for row in evening.rows:
-        if row.daylight_lux < controller.settings.threshold_lux:
-            below_from = below_from or row.when
-        else:
-            below_from = None
+        below_from = below_from or row.when if row.daylight_lux < controller.settings.threshold_lux else None
         if row.lit and below_from is not None:
             break
     assert below_from is not None
     lit_at = next(r.when for r in evening.rows if r.when >= below_from and r.lit)
     assert lit_at - below_from <= timedelta(minutes=20), (
-        "het was om %s donker genoeg en de lampen gingen pas om %s aan"
-        % (below_from.strftime("%H:%M"), lit_at.strftime("%H:%M"))
+        "het was om {} donker genoeg en de lampen gingen pas om {} aan".format(below_from.strftime("%H:%M"), lit_at.strftime("%H:%M"))
     )
 
 

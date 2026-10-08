@@ -79,7 +79,8 @@
         "menu_options": {
           "rooms": "Ruimtes",
           "when": "Wanneer Calm stuurt",
-          "rhythm": "Dagritme"
+          "rhythm": "Dagritme",
+          "journal": "Dagverslag"
         }
       },
       "rooms": {
@@ -149,6 +150,13 @@
               "cool_kelvin": "Koelste kleur"
             }
           }
+        }
+      },
+      "journal": {
+        "title": "Dagverslag",
+        "description": "Elke ruimte kan per dag een verslag schrijven in config/calm: elke meting, wie er binnenkomt en vertrekt, en waarom Calm iets deed. Handig om een vreemd moment terug te zoeken. Het legt vast wanneer ruimtes bezet zijn, dus het staat standaard uit. Twee weken worden bewaard.",
+        "data": {
+          "journal": "Dagverslag bijhouden"
         }
       }
     }
@@ -427,7 +435,25 @@
     },
     "sensor": {
       "why": {
-        "name": "Waarom"
+        "name": "Waarom",
+        "state": {
+          "no_reading": "Wacht op de lichtsensor",
+          "manual": "Met de hand ingesteld",
+          "switched_off": "Met de hand uitgezet",
+          "override": "Stand aan",
+          "override_auto": "Stand vanzelf aan",
+          "daylight": "Genoeg daglicht",
+          "returning": "Wacht op terugkeer",
+          "standby": "Standby",
+          "empty": "Niemand gezien",
+          "inactive": "Calm regelt niet",
+          "nightlight": "Nachtlampje",
+          "motion_while_off": "Licht door beweging",
+          "morning": "Ochtend",
+          "daytime": "Overdag",
+          "evening": "Avond",
+          "night": "Nacht"
+        }
       },
       "daylight": {
         "name": "Daglicht"
@@ -456,8 +482,17 @@
   },
   "issues": {
     "condition_missing": {
-      "title": "Calm kijkt naar iets dat niet meer bestaat",
-      "description": "Calm stuurt de lampen alleen aan als {entity} in de gekozen stand staat, maar die entiteit bestaat niet meer. Daardoor blijven de lampen uit.\n\nKies een andere via Instellingen → Apparaten en diensten → Calm → Configureren → Wanneer, of bij de ruimte zelf als die een eigen ‘wanneer’ heeft."
+      "title": "Calm kijkt in {room} naar iets dat niet meer bestaat",
+      "description": "Calm stuurt de lampen in {room} alleen aan als {entity} in de gekozen stand staat, maar die entiteit bestaat niet meer. Daardoor blijven de lampen uit.\n\nKies een andere via Instellingen → Apparaten en diensten → Calm → Configureren → Wanneer, of bij de ruimte zelf als die een eigen ‘wanneer’ heeft."
+    },
+    "commands_failing": {
+      "title": "Calm kan de lampen in {room} niet aansturen",
+      "description": "De laatste opdrachten aan de lampen in {room} mislukten: {error}\n\nKijk of de lampen en hun integratie in Home Assistant werken. Deze melding verdwijnt vanzelf zodra een opdracht weer lukt."
+    }
+  },
+  "device": {
+    "room": {
+      "name": "Calm"
     }
   }
 }

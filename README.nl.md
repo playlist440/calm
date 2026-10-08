@@ -43,16 +43,59 @@ Daarna: *Instellingen → Apparaten en diensten → Integratie toevoegen → Cal
 
 ## De Calm-kaart
 
+Voeg hem toe via de kaartkiezer van het dashboard (zoek op *Calm*) en kies de ruimte, of in YAML:
+
 ```yaml
 type: custom:calm-card
 entity: sensor.keuken_calm_waarom
 ```
 
-Sleep de streep om te kiezen vanaf hoe donker de lampen aangaan. Het markeertje laat het daglicht van dit moment zien. Onder de balk staat wat de stand onder je vinger nu betekent, bijvoorbeeld: *Nu 34 lux daglicht op de sensor. Bij deze stand blijven de lampen uit.* Zijn de lampen aan, dan rekent de kaart hun licht eraf: dat vergelijkt Calm ook.
+Sleep de streep om te kiezen vanaf hoe donker de lampen aangaan. Het markeertje laat het daglicht van dit moment zien. Onder de balk staat wat de stand onder je vinger nu betekent, bijvoorbeeld: *Nu 34 lux daglicht op de sensor. Bij deze stand blijven de lampen uit.* Zijn de lampen aan, dan rekent de kaart hun licht eraf, net als Calm.
 
-## Het dagverslag van een ruimte
+## Wat elke ruimte heeft
 
-Elke ruimte schrijft een dagverslag naar `config/calm/<ruimte>/`: één regel per meting, met de regel die besliste en de reden. Er worden twee weken bewaard. Open het in een spreadsheet als je wilt weten waarom er vorige week dinsdag om half tien iets gebeurde.
+- **Calm** (schakelaar): of Calm de ruimte nu regelt.
+- **Waarom** (sensor): de reden dat de lampen zijn zoals ze zijn, uit een vaste lijst; de hele zin staat in het attribuut `sentence`.
+- **Lampen aan als het donkerder is dan**, **Hoe fel overdag**, **Hoe fel 's avonds** (getallen).
+- **Neem het weer over** (knop): stopt een handmatige overname meteen.
+- Een schakelaar per stand, en diagnostische sensoren (daglicht, doel, kleurtemperatuur, betrouwbaarheid, lampbijdrage, verstuurde commando's), de meeste standaard uit.
+
+Calm rekent opnieuw als een sensor iets meldt, als iemand beweegt, als een lamp verandert en elke 30 seconden. Een opdracht gaat alleen de deur uit als er genoeg veranderde.
+
+## Ondersteunde apparaten
+
+Alle lampen die Home Assistant kan dimmen, elke lichtsensor en elke bewegings- of aanwezigheidssensor. Dagelijks getest met Philips Hue-lampen en Hue-bewegingssensoren. Hue-ruimtes en -zones laat Calm bewust links liggen: Calm stuurt de lampen zelf aan.
+
+## Dagverslag en diagnostiek
+
+**Diagnostiek** (⋮ bij de integratie → *Diagnostiek downloaden*) laat zien wat elke ruimte denkt: instellingen, lampen, sensoren, de geleerde lampbijdrage en de laatste opdracht.
+
+**Dagverslag** (standaard uit): *Calm → Configureren → Dagverslag*. Elke ruimte schrijft dan per dag een CSV naar `config/calm/<ruimte-id>/`: elke meting, wie er binnenkomt en vertrekt, en de reden achter elke beslissing. Er worden twee weken bewaard. Het legt vast wanneer ruimtes bezet zijn, en staat daarom alleen aan als je dat kiest.
+
+## Bekende beperkingen
+
+- **Ruimtes die dezelfde lichtsensor delen** zien elkaars lampen als daglicht. In de praktijk heeft een ruimte dan iets minder eigen licht nodig als de ruimte ernaast brandt, en dat is meestal precies wat je wilt.
+- De sensor meet waar hij hangt, niet bij je ogen. Zet de streep met de kaart op het moment dat de ruimte goed voelt.
+- Een Hue-bewegingssensor meldt licht ongeveer elke vijf minuten; een wolk die korter duurt, ziet hij niet.
+
+## Problemen oplossen
+
+- **De lampen doen niets**: kijk naar de *Waarom*-sensor van de ruimte; die noemt de regel die nu geldt. Onder Instellingen → Reparaties staat het als een voorwaarde niet meer bestaat of als lampopdrachten blijven mislukken.
+- **Calm gaat onverwacht opzij**: iets anders dan Calm veranderde een lamp: een automatisering, een Hue-scène of een schakelaar. Calm logt op INFO-niveau welke lamp veranderde en wat het zelf had gevraagd.
+- **De kaart zegt "Custom element doesn't exist"**: herlaad de pagina met een lege cache.
+
+## Calm verwijderen
+
+*Instellingen → Apparaten en diensten → Calm → ⋮ → Verwijderen*. Calm ruimt zijn opgeslagen kennis en dagverslagen mee op. De kaart haal je zelf van je dashboards.
+
+## Ontwikkelen
+
+De regelkern (`custom_components/calm/core`) bevat geen Home Assistant en wordt los getest, ook met hele gesimuleerde dagen. De Home Assistant-kant wordt getest tegen een echte Home Assistant.
+
+```bash
+uv venv --python 3.14 && uv pip install -r requirements_test.txt
+uv run ruff check custom_components tests && uv run mypy && uv run pytest
+```
 
 ## Licentie
 

@@ -107,7 +107,7 @@ async def test_only_things_that_are_on_or_off_can_be_picked(hass: HomeAssistant,
 
 async def test_a_room_without_a_sensor_asks_for_one(hass: HomeAssistant, house, kitchen) -> None:
     house.lamp("bureau", "Kantoor")
-    result = await install(hass, [house.area("Kantoor")], sensors=[kitchen["s7_lux"]])
+    await install(hass, [house.area("Kantoor")], sensors=[kitchen["s7_lux"]])
     entry = hass.config_entries.async_entries(DOMAIN)[0]
     room = next(iter(entry.subentries.values()))
     assert room.data["light_sensor"] == kitchen["s7_lux"]
@@ -154,7 +154,7 @@ async def installed(hass: HomeAssistant, kitchen):
 
 async def test_ticking_a_room_in_the_settings_adds_it(hass: HomeAssistant, house, kitchen) -> None:
     entry = await installed(hass, kitchen)
-    s, _ = house.hue_motion_sensor("s9", "Gang")
+    _s, _ = house.hue_motion_sensor("s9", "Gang")
     house.lamp("gang_1", "Gang")
     result = await hass.config_entries.options.async_init(entry.entry_id)
     result = await hass.config_entries.options.async_configure(result["flow_id"], {"next_step_id": "rooms"})

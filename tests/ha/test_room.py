@@ -11,7 +11,6 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
-from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
     async_fire_time_changed,
@@ -115,7 +114,7 @@ async def test_nobody_home_keeps_it_dark_and_says_why(hass, kitchen, freezer, la
     hass.states.async_set(kitchen["room_lux"], "2")
     entry = await start(hass, kitchen)
     assert not lamp_calls
-    why = hass.states.get(entity(hass, entry, "sensor", "why")).state
+    why = hass.states.get(entity(hass, entry, "sensor", "why")).attributes["sentence"]
     assert "nobody is home" in why
 
 
@@ -124,7 +123,7 @@ async def test_coming_home_lights_the_room(hass, kitchen, freezer, lamp_calls) -
     await amsterdam(hass)
     home(hass, at_home=False)
     hass.states.async_set(kitchen["room_lux"], "2")
-    entry = await start(hass, kitchen)
+    await start(hass, kitchen)
     home(hass, at_home=True)
     await hass.async_block_till_done()
     assert lamp_calls, "thuiskomen gaf geen licht"
@@ -139,7 +138,7 @@ async def test_walking_into_the_dark_kitchen_lights_it_at_once(hass, kitchen, fr
     hass.states.async_set(kitchen["room_lux"], "2")
     hass.states.async_set(kitchen["room_motion"], "off")
     freezer.tick(timedelta(hours=1))
-    entry = await start(hass, kitchen, use_motion=True, when_empty="off")
+    await start(hass, kitchen, use_motion=True, when_empty="off")
     assert not lamp_calls, "de lege keuken ging aan"
     hass.states.async_set(kitchen["room_motion"], "on")
     await hass.async_block_till_done()
@@ -230,14 +229,24 @@ async def test_a_hand_on_the_lamps_is_noticed(hass, kitchen, freezer, lamp_calls
     assert room.controller.manual
 
 
+async def test_no_day_file_unless_the_household_asks_for_one(hass, kitchen, freezer) -> None:
+    """It records when rooms are occupied, so it is opt-in."""
+    await amsterdam(hass)
+    home(hass)
+    hass.states.async_set(kitchen["room_lux"], "2")
+    entry = await start(hass, kitchen)
+    await hass.async_block_till_done()
+    assert not Path(hass.config.path("calm", next(iter(entry.subentries)))).exists()
+
+
 async def test_the_room_keeps_its_own_day_file(hass, kitchen, freezer) -> None:
     freezer.move_to(EVENING)
     await amsterdam(hass)
     home(hass)
     hass.states.async_set(kitchen["room_lux"], "2")
-    await start(hass, kitchen)
+    entry = await start(hass, kitchen, options={"when": {"home": True}, "journal": True})
     await hass.async_block_till_done()
-    files = list(Path(hass.config.path("calm", "keuken")).glob("*.csv"))
+    files = list(Path(hass.config.path("calm", next(iter(entry.subentries)))).glob("*.csv"))
     assert files, "er werd geen dagverslag geschreven"
     lines = files[0].read_text().splitlines()
     assert lines[0].startswith("time,measured_lux")
@@ -295,14 +304,17 @@ async def test_a_day_file_from_calm_1_is_set_aside_not_mixed(hass, kitchen) -> N
     columns. Appending to it would put two kinds of line under one header."""
     await amsterdam(hass)
     home(hass)
-    folder = Path(hass.config.path("calm", "keuken"))
-    folder.mkdir(parents=True, exist_ok=True)
-    old = folder / "2026-09-29.csv"
-    old.write_text("time,measured_lux,daylight_lux,target_lux,master,kelvin,state\n2026-09-29T06:00:00+02:00,0,0,10,0,2200,off\n")
     hass.states.async_set(kitchen["room_lux"], "2")
-    await start(hass, kitchen)
+    entry = await start(hass, kitchen, options={"when": {"home": True}, "journal": True})
     await hass.async_block_till_done()
-    assert (folder / "2026-09-29-eerder.csv").exists(), "het oude dagverslag werd niet apart gezet"
+    folder = Path(hass.config.path("calm", next(iter(entry.subentries))))
+    (folder / "2026-09-29.csv").write_text(
+        "time,measured_lux,daylight_lux,target_lux,master,kelvin,state\n2026-09-29T06:00:00+02:00,0,0,10,0,2200,off\n")
+    room = entry.runtime_data.rooms[next(iter(entry.subentries))]
+    room.journal._pruned_on = None
+    room._run(2.0)
+    await hass.async_block_till_done()
+    assert (folder / "2026-09-29-previous.csv").exists(), "het oude dagverslag werd niet apart gezet"
     header = (folder / "2026-09-29.csv").read_text().splitlines()[0]
     assert "rung" in header
 
@@ -342,7 +354,7 @@ async def test_a_condition_that_no_longer_exists_is_put_under_repairs(hass, kitc
     entry = await start(hass, kitchen, options={"when": {
         "home": True, "entity": "sensor.nachtmodus_actief", "entity_state": "off"}})
     issues = ir.async_get(hass)
-    issue = issues.async_get_issue(DOMAIN, "condition_missing_sensor.nachtmodus_actief")
+    issue = issues.async_get_issue(DOMAIN, f"condition_missing_{next(iter(entry.subentries))}")
     assert issue is not None, "niemand hoort dat de voorwaarde niet meer bestaat"
     # At a start a condition still loading looks the same, so the room first
     # waits up to two minutes for it before it says why it stays dark.
@@ -350,12 +362,12 @@ async def test_a_condition_that_no_longer_exists_is_put_under_repairs(hass, kitc
         freezer.tick(timedelta(seconds=30))
         async_fire_time_changed(hass)
         await hass.async_block_till_done()
-    why = hass.states.get(entity(hass, entry, "sensor", "why")).state
+    why = hass.states.get(entity(hass, entry, "sensor", "why")).attributes["sentence"]
     assert "sensor.nachtmodus_actief" in why
 
     await hass.config_entries.async_unload(entry.entry_id)
     await hass.async_block_till_done()
-    assert issues.async_get_issue(DOMAIN, "condition_missing_sensor.nachtmodus_actief") is None
+    assert issues.async_get_issue(DOMAIN, f"condition_missing_{next(iter(entry.subentries))}") is None
 
 
 async def test_a_lamp_still_burning_after_calm_put_the_room_out_is_put_out_once(hass, kitchen, freezer, lamp_calls) -> None:

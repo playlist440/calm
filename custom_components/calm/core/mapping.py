@@ -24,7 +24,7 @@ once after dark. Two points, one line.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
+from typing import Any
 
 from .photometry import luminous_to_perceptual, perceptual_to_luminous
 
@@ -47,12 +47,12 @@ class DaylightResponse:
     #: been learned yet. Deliberately generous — see below.
     prior_off_at_lux: float = 480.0
     #: Most recent anchors; older ones are dropped.
-    anchors: List[Anchor] = field(default_factory=list)
+    anchors: list[Anchor] = field(default_factory=list)
     max_anchors: int = 8
     #: How strongly the prior slope resists being moved by a single anchor.
     prior_weight: float = 0.6
 
-    _slope: Optional[float] = None
+    _slope: float | None = None
 
     def __post_init__(self) -> None:
         if self.prior_off_at_lux <= 0:
@@ -140,7 +140,7 @@ class DaylightResponse:
         mean_x, mean_y = sum(xs) / n, sum(ys) / n
 
         spread = sum((x - mean_x) ** 2 for x in xs)
-        covariance = sum((x - mean_x) * (y - mean_y) for x, y in zip(xs, ys))
+        covariance = sum((x - mean_x) * (y - mean_y) for x, y in zip(xs, ys, strict=False))
 
         # Ridge towards the prior: with little spread in the anchors the fit
         # barely moves, and with a good range it takes over.
@@ -149,15 +149,15 @@ class DaylightResponse:
         self._slope = max(0.0, slope)
         self.dark_luminous = max(0.0, min(1.0, mean_y + self._slope * mean_x))
 
-    def snapshot(self) -> dict:
+    def snapshot(self) -> dict[str, Any]:
         return {
             "dark_luminous": self.dark_luminous,
             "slope": self._slope,
             "anchors": [(a.daylight_lux, a.luminous) for a in self.anchors],
         }
 
-    def restore(self, data: dict) -> None:
+    def restore(self, data: dict[str, Any]) -> None:
         self.dark_luminous = float(data.get("dark_luminous", self.dark_luminous))
         slope = data.get("slope")
         self._slope = None if slope is None else float(slope)
-        self.anchors = [Anchor(float(d), float(l)) for d, l in data.get("anchors", [])]
+        self.anchors = [Anchor(float(d), float(lum)) for d, lum in data.get("anchors", [])]

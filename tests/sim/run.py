@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Callable, List, Optional
 
 from custom_components.calm.core import Action, RoomController
 
@@ -18,28 +18,28 @@ class TraceRow:
     when: datetime
     true_lux: float
     daylight_lux: float
-    reported_lux: Optional[float]
+    reported_lux: float | None
     master: float
     mired: float
     action: str
     reason: str
     scene: str
-    rung: Optional[str]
+    rung: str | None
     transition_s: float
     lit: bool
 
 
 @dataclass
 class Trace:
-    rows: List[TraceRow] = field(default_factory=list)
+    rows: list[TraceRow] = field(default_factory=list)
 
-    def between(self, start: datetime, end: datetime) -> "Trace":
+    def between(self, start: datetime, end: datetime) -> Trace:
         return Trace([r for r in self.rows if start <= r.when < end])
 
-    def switched_on(self) -> List[TraceRow]:
+    def switched_on(self) -> list[TraceRow]:
         return [r for r in self.rows if r.action == Action.TURN_ON.value]
 
-    def switched_off(self) -> List[TraceRow]:
+    def switched_off(self) -> list[TraceRow]:
         return [r for r in self.rows if r.action == Action.TURN_OFF.value]
 
 
@@ -51,8 +51,8 @@ def run_day(
     start: datetime,
     hours: float,
     tick_s: float = 30.0,
-    enabled: Optional[Callable[[datetime], bool]] = None,
-    motion: Optional[Callable[[datetime], bool]] = None,
+    enabled: Callable[[datetime], bool] | None = None,
+    motion: Callable[[datetime], bool] | None = None,
 ) -> Trace:
     """Step the whole loop forward and record it.
 
@@ -62,7 +62,7 @@ def run_day(
     trace = Trace()
     now = start
     end = start + timedelta(hours=hours)
-    was_moving: Optional[bool] = None
+    was_moving: bool | None = None
 
     while now < end:
         if enabled is not None:

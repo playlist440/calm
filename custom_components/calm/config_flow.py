@@ -17,11 +17,12 @@ place, next to what the sensor reads right now.
 from __future__ import annotations
 
 from copy import deepcopy
-from typing import Any, Dict, List, Optional
+from datetime import time
+from types import MappingProxyType
+from typing import Any
 
 import voluptuous as vol
 from homeassistant.config_entries import (
-    SOURCE_RECONFIGURE,
     ConfigEntry,
     ConfigFlow,
     ConfigFlowResult,
@@ -43,11 +44,12 @@ from .const import (
     CONF_BRIGHTNESS,
     CONF_COOL_KELVIN,
     CONF_END,
-    CONF_EVENING_BRIGHTNESS,
     CONF_ENTITY,
     CONF_ENTITY_STATE,
+    CONF_EVENING_BRIGHTNESS,
     CONF_EXCLUDED,
     CONF_HOME,
+    CONF_JOURNAL,
     CONF_LIGHT_SENSOR,
     CONF_LIGHTS,
     CONF_MANUAL,
@@ -92,7 +94,17 @@ from .const import (
     DOMAIN,
     SUBENTRY_ROOM,
 )
-from .core import TEMPLATES, Override, OverrideSet, from_template, unique_key
+from .core import (
+    TEMPLATES,
+    AutoMode,
+    ColourMode,
+    LampRole,
+    LevelMode,
+    Override,
+    OverrideSet,
+    from_template,
+    unique_key,
+)
 
 # -- the words in a room's line in the list ------------------------------
 
@@ -147,14 +159,14 @@ def _describe(hass: HomeAssistant, contents: discovery.AreaContents) -> str:
     return f"{contents.name} — " + ", ".join(parts)
 
 
-def _room_options(hass: HomeAssistant, areas: List[discovery.AreaContents]):
+def _room_options(hass: HomeAssistant, areas: list[discovery.AreaContents]) -> list[selector.SelectOptionDict]:
     """Suitable rooms first, then the ones that need a sensor, each by name."""
     ordered = sorted(areas, key=lambda c: (not c.suitable, c.name.casefold()))
     return [selector.SelectOptionDict(value=c.area_id, label=_describe(hass, c)) for c in ordered]
 
 
-def _new_room(contents: discovery.AreaContents, sensor: Optional[str] = None) -> ConfigSubentryData:
-    data: Dict[str, Any] = {CONF_AREA: contents.area_id, CONF_NAME: contents.name,
+def _new_room(contents: discovery.AreaContents, sensor: str | None = None) -> ConfigSubentryData:
+    data: dict[str, Any] = {CONF_AREA: contents.area_id, CONF_NAME: contents.name,
                             CONF_THRESHOLD: DEFAULT_THRESHOLD}
     if sensor:
         data[CONF_LIGHT_SENSOR] = sensor
@@ -203,7 +215,7 @@ _WHEN_SECTIONS = {
 ON_OFF_ENTITY = selector.EntitySelector(selector.EntitySelectorConfig(domain=ON_OFF_DOMAINS))
 
 
-def _when_fields(when: When) -> Dict[Any, Any]:
+def _when_fields(when: When) -> dict[Any, Any]:
     return {
         vol.Required(CONF_HOME, default=when.home): selector.BooleanSelector(),
         vol.Optional(CONF_ENTITY, description={"suggested_value": when.entity}): ON_OFF_ENTITY,
@@ -218,14 +230,14 @@ def _when_fields(when: When) -> Dict[Any, Any]:
 def _when_schema(when: When) -> vol.Schema:
     fields = {str(key): (key, value) for key, value in _when_fields(when).items()}
     in_use = {"condition": bool(when.entity), "hours": when.window, "yourself": when.manual}
-    schema: Dict[Any, Any] = dict([fields[CONF_HOME]])
+    schema: dict[Any, Any] = dict([fields[CONF_HOME]])
     for name, keys in _WHEN_SECTIONS.items():
         schema[vol.Required(name)] = section(
             vol.Schema(dict(fields[key] for key in keys)), {"collapsed": not in_use[name]})
     return vol.Schema(schema)
 
 
-def _when_values(user_input: Dict[str, Any]) -> Dict[str, Any]:
+def _when_values(user_input: dict[str, Any]) -> dict[str, Any]:
     """The answers, whether they came folded in sections or flat."""
     flat = dict(user_input)
     for name in _WHEN_SECTIONS:
@@ -241,8 +253,8 @@ def _when_values(user_input: Dict[str, Any]) -> Dict[str, Any]:
     }).to_dict()
 
 
-def _rhythm_schema(rhythm: Dict[str, Any], colours: bool) -> vol.Schema:
-    fields: Dict[Any, Any] = {
+def _rhythm_schema(rhythm: dict[str, Any], colours: bool) -> vol.Schema:
+    fields: dict[Any, Any] = {
         vol.Required(CONF_WAKE, default=rhythm.get(CONF_WAKE, DEFAULT_WAKE)): TIME,
         vol.Required(CONF_BED, default=rhythm.get(CONF_BED, DEFAULT_BED)): TIME,
     }
@@ -256,7 +268,7 @@ def _rhythm_schema(rhythm: Dict[str, Any], colours: bool) -> vol.Schema:
     return vol.Schema(fields)
 
 
-def _rhythm_values(user_input: Dict[str, Any]) -> Dict[str, Any]:
+def _rhythm_values(user_input: dict[str, Any]) -> dict[str, Any]:
     colours = user_input.get("colours") or {}
     return {
         CONF_WAKE: user_input.get(CONF_WAKE, DEFAULT_WAKE),
@@ -276,26 +288,26 @@ class CalmConfigFlow(ConfigFlow, domain=DOMAIN):
     MINOR_VERSION = 1
 
     def __init__(self) -> None:
-        self._chosen: List[str] = []
-        self._needs_sensor: List[str] = []
-        self._sensors: Dict[str, str] = {}
-        self._when: Dict[str, Any] = When().to_dict()
+        self._chosen: list[str] = []
+        self._needs_sensor: list[str] = []
+        self._sensors: dict[str, str] = {}
+        self._when: dict[str, Any] = When().to_dict()
 
     @staticmethod
     @callback
-    def async_get_options_flow(entry: ConfigEntry) -> "CalmOptionsFlow":
+    def async_get_options_flow(entry: ConfigEntry) -> CalmOptionsFlow:
         return CalmOptionsFlow()
 
     @classmethod
     @callback
-    def async_get_supported_subentry_types(cls, entry: ConfigEntry):
+    def async_get_supported_subentry_types(cls, entry: ConfigEntry) -> dict[str, type[ConfigSubentryFlow]]:
         return {SUBENTRY_ROOM: RoomFlow}
 
-    async def async_step_user(self, user_input: Optional[Dict[str, Any]] = None) -> ConfigFlowResult:
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         areas = discovery.scan(self.hass)
         if not areas:
             return self.async_abort(reason="no_rooms")
-        errors: Dict[str, str] = {}
+        errors: dict[str, str] = {}
         if user_input is not None:
             chosen = list(user_input.get("rooms") or [])
             if not chosen:
@@ -317,7 +329,7 @@ class CalmConfigFlow(ConfigFlow, domain=DOMAIN):
             last_step=False,
         )
 
-    async def async_step_sensor(self, user_input: Optional[Dict[str, Any]] = None) -> ConfigFlowResult:
+    async def async_step_sensor(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """One screen per chosen room that has no light sensor of its own."""
         if user_input is not None and self._needs_sensor:
             area_id = self._needs_sensor.pop(0)
@@ -328,7 +340,8 @@ class CalmConfigFlow(ConfigFlow, domain=DOMAIN):
         if not self._needs_sensor:
             return await self.async_step_when()
         area_id = self._needs_sensor[0]
-        name = discovery.contents(self.hass, area_id).name
+        found = discovery.contents(self.hass, area_id)
+        name = found.name if found else area_id
         return self.async_show_form(
             step_id="sensor",
             data_schema=vol.Schema({vol.Optional(CONF_LIGHT_SENSOR): LIGHT_SENSOR}),
@@ -336,14 +349,14 @@ class CalmConfigFlow(ConfigFlow, domain=DOMAIN):
             last_step=False,
         )
 
-    async def async_step_when(self, user_input: Optional[Dict[str, Any]] = None) -> ConfigFlowResult:
+    async def async_step_when(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:
             self._when = _when_values(user_input)
             return await self.async_step_rhythm()
         return self.async_show_form(
             step_id="when", data_schema=_when_schema(When.from_dict(self._when)), last_step=False)
 
-    async def async_step_rhythm(self, user_input: Optional[Dict[str, Any]] = None) -> ConfigFlowResult:
+    async def async_step_rhythm(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:
             rooms = []
             for area_id in self._chosen:
@@ -365,21 +378,21 @@ class CalmOptionsFlow(OptionsFlow):
     """Which rooms, and what they all share."""
 
     def __init__(self) -> None:
-        self._adding: List[str] = []
-        self._sensors: Dict[str, str] = {}
+        self._adding: list[str] = []
+        self._sensors: dict[str, str] = {}
 
-    async def async_step_init(self, user_input: Optional[Dict[str, Any]] = None) -> ConfigFlowResult:
-        return self.async_show_menu(step_id="init", menu_options=["rooms", "when", "rhythm"])
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        return self.async_show_menu(step_id="init", menu_options=["rooms", "when", "rhythm", "journal"])
 
-    def _active(self) -> Dict[str, str]:
+    def _active(self) -> dict[str, str]:
         """Area id to subentry id, for rooms that come from an area."""
         return {
-            sub.data.get(CONF_AREA): sub_id
+            str(sub.data[CONF_AREA]): sub_id
             for sub_id, sub in self.config_entry.subentries.items()
             if sub.subentry_type == SUBENTRY_ROOM and sub.data.get(CONF_AREA)
         }
 
-    async def async_step_rooms(self, user_input: Optional[Dict[str, Any]] = None) -> ConfigFlowResult:
+    async def async_step_rooms(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         areas = discovery.scan(self.hass)
         active = self._active()
         if user_input is not None:
@@ -400,7 +413,7 @@ class CalmOptionsFlow(OptionsFlow):
             }),
         )
 
-    async def async_step_room_sensor(self, user_input: Optional[Dict[str, Any]] = None) -> ConfigFlowResult:
+    async def async_step_room_sensor(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Add the newly ticked rooms, asking for a sensor where one is missing."""
         if user_input is not None and self._adding:
             area_id = self._adding.pop(0)
@@ -423,24 +436,34 @@ class CalmOptionsFlow(OptionsFlow):
             )
         return self.async_create_entry(data=dict(self.config_entry.options))
 
-    def _add(self, area_id: str, sensor: Optional[str]) -> None:
+    def _add(self, area_id: str, sensor: str | None) -> None:
         contents = discovery.contents(self.hass, area_id)
         if contents is None:
             return
         room = _new_room(contents, sensor)
         self.hass.config_entries.async_add_subentry(self.config_entry, ConfigSubentry(
-            data=room["data"], subentry_type=room["subentry_type"],
+            data=MappingProxyType(dict(room["data"])), subentry_type=room["subentry_type"],
             title=room["title"], unique_id=room["unique_id"],
         ))
 
-    async def async_step_when(self, user_input: Optional[Dict[str, Any]] = None) -> ConfigFlowResult:
+    async def async_step_when(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:
             return self.async_create_entry(
                 data={**self.config_entry.options, CONF_WHEN: _when_values(user_input)})
         when = When.from_dict(self.config_entry.options.get(CONF_WHEN))
         return self.async_show_form(step_id="when", data_schema=_when_schema(when))
 
-    async def async_step_rhythm(self, user_input: Optional[Dict[str, Any]] = None) -> ConfigFlowResult:
+    async def async_step_journal(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """Whether rooms keep a day file. Off by default: it records when rooms are occupied."""
+        if user_input is not None:
+            return self.async_create_entry(
+                data={**self.config_entry.options, CONF_JOURNAL: bool(user_input.get(CONF_JOURNAL))})
+        return self.async_show_form(step_id="journal", data_schema=vol.Schema({
+            vol.Required(CONF_JOURNAL, default=bool(self.config_entry.options.get(CONF_JOURNAL))):
+                selector.BooleanSelector(),
+        }))
+
+    async def async_step_rhythm(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:
             return self.async_create_entry(
                 data={**self.config_entry.options, CONF_RHYTHM: _rhythm_values(user_input)})
@@ -455,32 +478,32 @@ class RoomFlow(ConfigSubentryFlow):
     """Adding a room, and a room's own settings and overrides."""
 
     def __init__(self) -> None:
-        self._area: Optional[str] = None
-        self._override_key: Optional[str] = None
-        #: A room's settings on their way to being saved, while its own
-        #: "when" or rhythm is asked for on a screen of its own.
-        self._pending: Optional[Dict[str, Any]] = None
-        #: A new override made from a template but not saved yet: it is only
-        #: stored once its own screen has been answered.
-        self._pending: Optional[Dict[str, Any]] = None
+        self._area: str | None = None
+        self._override_key: str | None = None
+        #: A room's data on its way to being saved: settings while its own
+        #: "when" or rhythm is asked for, or a new override until its own
+        #: screen has been answered.
+        self._pending: dict[str, Any] | None = None
 
     # -- adding --------------------------------------------------------
 
-    async def async_step_user(self, user_input: Optional[Dict[str, Any]] = None) -> SubentryFlowResult:
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
         return self.async_show_menu(step_id="user", menu_options=["area", "custom"])
 
-    def _taken(self) -> set:
+    def _taken(self) -> set[str]:
         return {
-            sub.data.get(CONF_AREA) for sub in self._get_entry().subentries.values()
-            if sub.subentry_type == SUBENTRY_ROOM
+            str(sub.data[CONF_AREA]) for sub in self._get_entry().subentries.values()
+            if sub.subentry_type == SUBENTRY_ROOM and sub.data.get(CONF_AREA)
         }
 
-    async def async_step_area(self, user_input: Optional[Dict[str, Any]] = None) -> SubentryFlowResult:
+    async def async_step_area(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
         areas = [c for c in discovery.scan(self.hass) if c.area_id not in self._taken()]
         if not areas:
             return self.async_abort(reason="no_more_rooms")
         if user_input is not None:
             contents = discovery.contents(self.hass, user_input[CONF_AREA])
+            if contents is None:
+                return self.async_abort(reason="no_more_rooms")
             if contents.suitable:
                 room = _new_room(contents)
                 return self.async_create_entry(
@@ -495,9 +518,11 @@ class RoomFlow(ConfigSubentryFlow):
             }),
         )
 
-    async def async_step_area_sensor(self, user_input: Optional[Dict[str, Any]] = None) -> SubentryFlowResult:
-        contents = discovery.contents(self.hass, self._area)
-        errors: Dict[str, str] = {}
+    async def async_step_area_sensor(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+        contents = discovery.contents(self.hass, self._area) if self._area else None
+        if contents is None:
+            return self.async_abort(reason="no_more_rooms")
+        errors: dict[str, str] = {}
         if user_input is not None:
             if user_input.get(CONF_LIGHT_SENSOR):
                 room = _new_room(contents, user_input[CONF_LIGHT_SENSOR])
@@ -511,8 +536,8 @@ class RoomFlow(ConfigSubentryFlow):
             errors=errors,
         )
 
-    async def async_step_custom(self, user_input: Optional[Dict[str, Any]] = None) -> SubentryFlowResult:
-        errors: Dict[str, str] = {}
+    async def async_step_custom(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+        errors: dict[str, str] = {}
         if user_input is not None:
             if not user_input.get(CONF_LIGHTS):
                 errors[CONF_LIGHTS] = "no_lights"
@@ -542,27 +567,27 @@ class RoomFlow(ConfigSubentryFlow):
 
     # -- a room's settings ----------------------------------------------
 
-    def _room(self) -> Dict[str, Any]:
+    def _room(self) -> dict[str, Any]:
         return deepcopy(dict(self._get_reconfigure_subentry().data))
 
-    def _save(self, data: Dict[str, Any]) -> SubentryFlowResult:
+    def _save(self, data: dict[str, Any]) -> SubentryFlowResult:
         return self.async_update_and_abort(
             self._get_entry(), self._get_reconfigure_subentry(), data=data)
 
-    async def async_step_reconfigure(self, user_input: Optional[Dict[str, Any]] = None) -> SubentryFlowResult:
+    async def async_step_reconfigure(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
         return self.async_show_menu(step_id="reconfigure", menu_options=["settings", "overrides"])
 
-    async def async_step_settings(self, user_input: Optional[Dict[str, Any]] = None) -> SubentryFlowResult:
+    async def async_step_settings(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
         data = self._room()
         hass = self.hass
         lights = discovery.room_lights(hass, data)
         motion = discovery.room_motion_sensor(hass, data)
-        entry = self._get_entry()
+        self._get_entry()
         if user_input is not None:
             self._pending = _settings_values(data, user_input, motion is not None)
             return await self._next_or_save()
 
-        fields: Dict[Any, Any] = {
+        fields: dict[Any, Any] = {
             vol.Required("light"): section(vol.Schema({
                 vol.Required(CONF_THRESHOLD, default=data.get(CONF_THRESHOLD, DEFAULT_THRESHOLD)):
                     selector.NumberSelector(selector.NumberSelectorConfig(
@@ -593,21 +618,23 @@ class RoomFlow(ConfigSubentryFlow):
                     selector.BooleanSelector(),
                 vol.Required(CONF_NIGHTLIGHT_LEVEL, default=data.get(CONF_NIGHTLIGHT_LEVEL, DEFAULT_NIGHTLIGHT_LEVEL)):
                     _percent(1, 30),
-                vol.Required(CONF_NIGHTLIGHT_KELVIN, default=data.get(CONF_NIGHTLIGHT_KELVIN, DEFAULT_NIGHTLIGHT_KELVIN)):
+                vol.Required(CONF_NIGHTLIGHT_KELVIN,
+                             default=data.get(CONF_NIGHTLIGHT_KELVIN, DEFAULT_NIGHTLIGHT_KELVIN)):
                     _kelvin(1800, 3000),
             }), {"collapsed": False})
-        # Only the switch here. The fields came on the next screen: shown
-        # here, they were changed and silently thrown away while the switch
-        # was off, which is how night mode went unchanged twice on 30 September.
+        # Only the switch here; the fields follow on a screen of their own. A
+        # field that only counts while a switch beside it is on must not be
+        # shown while it is off: changes to it would be thrown away silently.
         fields[vol.Required("when")] = section(vol.Schema({
             vol.Required(CONF_OWN_WHEN, default=bool(data.get(CONF_OWN_WHEN))): selector.BooleanSelector(),
         }), {"collapsed": not data.get(CONF_OWN_WHEN)})
         fields[vol.Required("rhythm")] = section(vol.Schema({
             vol.Required(CONF_OWN_RHYTHM, default=bool(data.get(CONF_OWN_RHYTHM))): selector.BooleanSelector(),
         }), {"collapsed": not data.get(CONF_OWN_RHYTHM)})
-        lamps_schema: Dict[Any, Any] = {}
+        lamps_schema: dict[Any, Any] = {}
         if lights:
-            lamps_schema[vol.Optional(CONF_EXCLUDED, default=[e for e in data.get(CONF_EXCLUDED, []) if e in lights])] = (
+            excluded = [e for e in data.get(CONF_EXCLUDED, []) if e in lights]
+            lamps_schema[vol.Optional(CONF_EXCLUDED, default=excluded)] = (
                 selector.EntitySelector(selector.EntitySelectorConfig(
                     domain="light", multiple=True, include_entities=lights)))
         lamps_schema.update({
@@ -630,7 +657,7 @@ class RoomFlow(ConfigSubentryFlow):
             },
         )
 
-    def _reading(self, data: Dict[str, Any]) -> str:
+    def _reading(self, data: dict[str, Any]) -> str:
         """What the sensor read as the screen opened, under the line's slider.
 
         A form cannot follow the sensor while it is open; the Calm card can.
@@ -662,7 +689,7 @@ class RoomFlow(ConfigSubentryFlow):
             return await self.async_step_room_rhythm()
         return self._save(pending)
 
-    async def async_step_room_when(self, user_input: Optional[Dict[str, Any]] = None) -> SubentryFlowResult:
+    async def async_step_room_when(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
         """This room's own "when", on the same screen Calm's own uses."""
         pending = self._pending or self._room()
         if user_input is not None:
@@ -677,7 +704,7 @@ class RoomFlow(ConfigSubentryFlow):
             last_step=not pending.get(CONF_OWN_RHYTHM),
         )
 
-    async def async_step_room_rhythm(self, user_input: Optional[Dict[str, Any]] = None) -> SubentryFlowResult:
+    async def async_step_room_rhythm(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
         pending = self._pending or self._room()
         if user_input is not None:
             pending[CONF_RHYTHM] = _rhythm_values(user_input)
@@ -690,7 +717,7 @@ class RoomFlow(ConfigSubentryFlow):
             description_placeholders={"room": pending.get(CONF_NAME, "")},
         )
 
-    async def async_step_overrides(self, user_input: Optional[Dict[str, Any]] = None) -> SubentryFlowResult:
+    async def async_step_overrides(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
         """Pick one to change, or start a new one."""
         data = self._room()
         overrides = OverrideSet.from_list(data.get(CONF_OVERRIDES) or [])
@@ -710,10 +737,10 @@ class RoomFlow(ConfigSubentryFlow):
             last_step=False,
         )
 
-    async def async_step_override_new(self, user_input: Optional[Dict[str, Any]] = None) -> SubentryFlowResult:
+    async def async_step_override_new(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
         """Start from a template, with a name filled in."""
         names = _TEMPLATE_NAMES[_lang(self.hass)]
-        errors: Dict[str, str] = {}
+        errors: dict[str, str] = {}
         if user_input is not None and "template" in user_input:
             data = self._room()
             overrides = OverrideSet.from_list(data.get(CONF_OVERRIDES) or [])
@@ -744,11 +771,13 @@ class RoomFlow(ConfigSubentryFlow):
             last_step=False,
         )
 
-    async def async_step_override(self, user_input: Optional[Dict[str, Any]] = None) -> SubentryFlowResult:
+    async def async_step_override(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
         """One override's answers: lamps, level, colour, and whether it starts itself."""
         data = self._pending or self._room()
         overrides = OverrideSet.from_list(data.get(CONF_OVERRIDES) or [])
-        override = overrides.get(self._override_key)
+        override = overrides.get(self._override_key) if self._override_key else None
+        if override is None:
+            return self.async_abort(reason="reconfigure_successful")
         lights = discovery.room_lights(self.hass, data)
         if user_input is not None and "level_mode" in user_input:
             if user_input.get("remove"):
@@ -759,7 +788,7 @@ class RoomFlow(ConfigSubentryFlow):
             return self._save(data)
 
         on = [e for e in lights if override.lamps.get(e, None) is None or override.lamps[e].value != "off"]
-        schema: Dict[Any, Any] = {
+        schema: dict[Any, Any] = {
             vol.Optional("lights", default=on): selector.EntitySelector(selector.EntitySelectorConfig(
                 domain="light", multiple=True, include_entities=lights)),
             vol.Required("level_mode", default=override.level_mode.value): selector.SelectSelector(
@@ -776,8 +805,10 @@ class RoomFlow(ConfigSubentryFlow):
             vol.Required("auto", default=override.auto.value): selector.SelectSelector(
                 selector.SelectSelectorConfig(options=["none", "time", "entity"], translation_key="auto",
                                               mode=selector.SelectSelectorMode.LIST)),
-            vol.Required("auto_start", default=(override.auto_start.isoformat() if override.auto_start else "17:30:00")): TIME,
-            vol.Required("auto_end", default=(override.auto_end.isoformat() if override.auto_end else "19:00:00")): TIME,
+            vol.Required("auto_start",
+                         default=override.auto_start.isoformat() if override.auto_start else "17:30:00"): TIME,
+            vol.Required("auto_end",
+                         default=override.auto_end.isoformat() if override.auto_end else "19:00:00"): TIME,
             vol.Optional("auto_entity", description={"suggested_value": override.auto_entity}):
                 selector.EntitySelector(),
             vol.Required("auto_state", default=override.auto_state): selector.TextSelector(),
@@ -794,7 +825,7 @@ class RoomFlow(ConfigSubentryFlow):
         return key in stored
 
 
-def _settings_values(data: Dict[str, Any], user_input: Dict[str, Any], has_motion: bool) -> Dict[str, Any]:
+def _settings_values(data: dict[str, Any], user_input: dict[str, Any], has_motion: bool) -> dict[str, Any]:
     """A room's settings screen, back into what is stored."""
     result = dict(data)
     light = user_input.get("light") or {}
@@ -827,12 +858,8 @@ def _settings_values(data: Dict[str, Any], user_input: Dict[str, Any], has_motio
     return result
 
 
-def _override_values(override: Override, user_input: Dict[str, Any], lights: List[str]) -> Override:
+def _override_values(override: Override, user_input: dict[str, Any], lights: list[str]) -> Override:
     """An override's screen, back into an override."""
-    from datetime import time
-
-    from .core import AutoMode, ColourMode, LampRole, LevelMode
-
     chosen = set(user_input.get("lights") or [])
     lamps = {e: (LampRole.ON if e in chosen else LampRole.OFF) for e in lights}
     level_mode = LevelMode(user_input.get("level_mode", "relative"))

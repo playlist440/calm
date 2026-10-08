@@ -25,13 +25,12 @@ from custom_components.calm.core import (
     OverrideSet,
     RoomController,
     RoomSettings,
-    Scene,
     Why,
 )
 from custom_components.calm.core.overrides import AutoMode, ColourMode
 from custom_components.calm.core.photometry import perceptual_to_device
 
-from .helpers import UTRECHT, make_profile
+from .helpers import UTRECHT
 
 TZ = ZoneInfo("Europe/Amsterdam")
 STEP = 30.0
@@ -360,7 +359,7 @@ def test_the_ordinary_step_stays_under_the_limit():
     clock.run(10, lux=5.0)
     before = c.master
     for lux in (6, 9, 12, 16, 20, 22, 15, 10, 6):
-        command = clock.run(5, lux=float(lux))
+        clock.run(5, lux=float(lux))
         budget = c.config.slew_up_per_minute * 5 * c.config.morning_allowance
         assert abs(c.master - before) <= budget + 1e-9
         before = c.master
@@ -483,7 +482,7 @@ def test_somebody_already_in_the_room_gets_the_light_when_the_sun_goes():
     clock.move(True)
     clock.tick(4.0)
     clock.move(True)
-    command = clock.tick(None)
+    clock.tick(None)
     assert c.lit
     assert clock.turned_on()[-1].diagnostics["reason"] in ("motion", "arrival")
 
@@ -740,7 +739,7 @@ def test_a_silent_sensor_counts_as_dark_for_how_bright_as_well():
     clock.run(7 * 60, lux=None)
     assert c.sensor_stale
     clock.move(True)
-    command = clock.tick(None)
+    clock.tick(None)
     assert c.lit
     assert c.master > c.profile.group_floor * 2, (
         "een zwijgende sensor bepaalde nog steeds hoe fel: de lampen bleven op de ondergrens"
@@ -769,7 +768,7 @@ def test_moving_the_line_is_answered_now():
     assert not c.lit
     c.set_threshold(60.0)
     clock.tick(40.0)
-    command = clock.tick(None)
+    clock.tick(None)
     assert c.lit, "het doel verzetten liet de kamer alsnog wachten"
 
 

@@ -15,12 +15,12 @@ and that has nothing to do with Home Assistant.
 
 from __future__ import annotations
 
-from typing import Callable, Dict, Iterable, Optional
+from collections.abc import Callable, Iterable
 
 
 def label_lamps(
-    entity_ids: Iterable[str], name_of: Callable[[str], Optional[str]]
-) -> Dict[str, str]:
+    entity_ids: Iterable[str], name_of: Callable[[str], str | None]
+) -> dict[str, str]:
     """Map a label per lamp back to its entity id, in the given order.
 
     Two lamps with the same name both get their entity id appended — not
@@ -28,8 +28,8 @@ def label_lamps(
     suggest it is *the* "Spot", and picking the wrong one of two identically
     named lamps is a mistake nobody would ever think to look for.
     """
-    labels: Dict[str, str] = {}
-    claimed: Dict[str, str] = {}
+    labels: dict[str, str] = {}
+    claimed: dict[str, str] = {}
 
     for entity_id in entity_ids:
         name = (name_of(entity_id) or "").strip() or entity_id
@@ -40,7 +40,7 @@ def label_lamps(
 
         first = claimed[name]
         labels.pop(name, None)
-        labels["%s (%s)" % (name, first)] = first
-        labels["%s (%s)" % (name, entity_id)] = entity_id
+        labels[f"{name} ({first})"] = first
+        labels[f"{name} ({entity_id})"] = entity_id
 
     return labels

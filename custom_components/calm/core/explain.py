@@ -11,10 +11,11 @@ the sentence is for somebody standing in the kitchen.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, time, timedelta
 from enum import Enum
-from typing import Any, Dict, Mapping, Optional
+from typing import Any
 
 
 class Why(Enum):
@@ -40,7 +41,7 @@ class Why(Enum):
 class Explanation:
     why: Why
     sentence: str
-    detail: Dict[str, Any]
+    detail: dict[str, Any]
 
 
 _WORDS = {
@@ -51,7 +52,10 @@ _WORDS = {
         Why.OVERRIDE: "{mode} staat aan.",
         Why.OVERRIDE_AUTO: "{mode} ging vanzelf aan.",
         Why.DAYLIGHT: "Uit: er is genoeg daglicht.",
-        Why.RETURNING: "Nog even uit: het daglicht is net weggevallen, en Calm wacht {wait} om zeker te weten dat het geen wolk is.",
+        Why.RETURNING: (
+            "Nog even uit: het daglicht is net weggevallen, en Calm wacht {wait} "
+            "om zeker te weten dat het geen wolk is."
+        ),
         Why.STANDBY: "Standby: er is al een tijd niemand gezien. Bij de eerste beweging staat de ruimte er weer.",
         Why.EMPTY: "Uit: er is al een tijd niemand gezien. Bij de eerste beweging gaan ze aan.",
         Why.INACTIVE: "Uit: {because}.",
@@ -69,7 +73,9 @@ _WORDS = {
         Why.OVERRIDE: "{mode} is on.",
         Why.OVERRIDE_AUTO: "{mode} switched on by itself.",
         Why.DAYLIGHT: "Off: there is enough daylight.",
-        Why.RETURNING: "Off a little longer: the daylight has just gone, and Calm is waiting {wait} to be sure it is not a cloud.",
+        Why.RETURNING: (
+            "Off a little longer: the daylight has just gone, and Calm is waiting {wait} to be sure it is not a cloud."
+        ),
         Why.STANDBY: "Standby: nobody has been seen for a while. The first movement brings the room back.",
         Why.EMPTY: "Off: nobody has been seen for a while. The first movement brings them on.",
         Why.INACTIVE: "Off: {because}.",
@@ -156,7 +162,8 @@ def explain(
     return Explanation(why=why, sentence=sentence, detail=detail)
 
 
-def _classify(reason, rung, scene, lit, morning, night, now, bed) -> Why:
+def _classify(reason: str, rung: str | None, scene: str | None, lit: bool, morning: bool, night: bool,
+              now: datetime, bed: Any) -> Why:
     if reason == "no_reading_yet":
         return Why.NO_READING
     if reason == "switched_off_by_hand":
@@ -188,7 +195,7 @@ def _classify(reason, rung, scene, lit, morning, night, now, bed) -> Why:
     return Why.DAYTIME
 
 
-def _countdown(seconds: Optional[float], language: str) -> str:
+def _countdown(seconds: float | None, language: str) -> str:
     """How much longer, rounded up so a wait still running never says zero."""
     words = _SPANS[language]
     if seconds is None or seconds < 60:

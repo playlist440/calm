@@ -37,10 +37,7 @@ def perceptual_to_luminous(perceptual: float) -> float:
 def luminous_to_perceptual(luminous: float) -> float:
     """Relative light output (0..1) back to perceived brightness (0..1)."""
     y = _clamp01(luminous)
-    if y > _LUMINOUS_KNEE:
-        lightness = 116.0 * (y ** (1.0 / 3.0)) - 16.0
-    else:
-        lightness = y * _LINEAR_SLOPE
+    lightness = 116.0 * y ** (1.0 / 3.0) - 16.0 if y > _LUMINOUS_KNEE else y * _LINEAR_SLOPE
     return _clamp01(lightness / 100.0)
 
 
@@ -51,7 +48,7 @@ def perceptual_to_device(perceptual: float) -> int:
     plain scaling. Where a lamp turns out to differ, the deviation is
     absorbed by the estimator rather than hard-coded here.
     """
-    return int(round(_clamp01(perceptual) * 255.0))
+    return round(_clamp01(perceptual) * 255.0)
 
 
 def device_to_perceptual(device: int) -> float:

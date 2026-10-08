@@ -1,9 +1,8 @@
 """One line per reading: what the room saw, and what it did about it.
 
-Written because "why did it do that this afternoon" otherwise depends on
-Home Assistant's recorder, which keeps the sensor reading and none of the
-reasoning that went with it. A room that cannot explain its own day is a room
-nobody can improve, and every fix in September was found in these files.
+Home Assistant's recorder keeps the sensor reading and none of the
+reasoning that went with it; this keeps both, so a room's day can be read
+back.
 
 The line carries the rung of the ladder that decided, because that is the
 first thing anybody reading it back wants to know.
@@ -15,7 +14,7 @@ pasted into an issue, compared against last week's.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, List, Optional
+from typing import Any
 
 COLUMNS = (
     "time",
@@ -56,20 +55,20 @@ def _number(value: Any, decimals: int = 1) -> str:
         return ""
 
 
-def _flag(value: Optional[bool]) -> str:
+def _flag(value: bool | None) -> str:
     """A yes, a no, or nothing at all, which is not the same as a no."""
     return "" if value is None else ("1" if value else "0")
 
 
 def row(
     when: datetime,
-    measured_lux: Optional[float],
+    measured_lux: float | None,
     command: Any,
     commands_sent: int,
-    lit: Optional[bool] = None,
-    motion: Optional[bool] = None,
-    occupied: Optional[bool] = None,
-) -> List[str]:
+    lit: bool | None = None,
+    motion: bool | None = None,
+    occupied: bool | None = None,
+) -> list[str]:
     """One record, in the order of :data:`COLUMNS`.
 
     Takes the command rather than the controller, so what is written is

@@ -9,7 +9,7 @@ to start moving before the room actually gets darker.
 from __future__ import annotations
 
 import math
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 def solar_elevation(when: datetime, latitude: float, longitude: float) -> float:
@@ -17,7 +17,7 @@ def solar_elevation(when: datetime, latitude: float, longitude: float) -> float:
 
     ``when`` may be naive (treated as UTC) or timezone-aware.
     """
-    moment = when.astimezone(timezone.utc) if when.tzinfo else when.replace(tzinfo=timezone.utc)
+    moment = when.astimezone(UTC) if when.tzinfo else when.replace(tzinfo=UTC)
 
     julian_day = _julian_day(moment)
     t = (julian_day - 2451545.0) / 36525.0
@@ -38,7 +38,7 @@ def solar_elevation(when: datetime, latitude: float, longitude: float) -> float:
 
     mean_obliquity = (
         23.0
-        + (26.0 + ((21.448 - t * (46.815 + t * (0.00059 - t * 0.001813)))) / 60.0) / 60.0
+        + (26.0 + (21.448 - t * (46.815 + t * (0.00059 - t * 0.001813))) / 60.0) / 60.0
     )
     obliquity = mean_obliquity + 0.00256 * math.cos(math.radians(omega))
 

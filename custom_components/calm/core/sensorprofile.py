@@ -24,7 +24,6 @@ from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Deque, List, Optional
 
 
 class Speed(Enum):
@@ -76,8 +75,8 @@ class SensorWatcher:
     """Builds the profile from the readings as they arrive."""
 
     window: int = 60
-    _times: Deque[datetime] = field(default_factory=lambda: deque(maxlen=60))
-    _values: Deque[float] = field(default_factory=lambda: deque(maxlen=60))
+    _times: deque[datetime] = field(default_factory=lambda: deque(maxlen=60))
+    _values: deque[float] = field(default_factory=lambda: deque(maxlen=60))
 
     def observe(self, when: datetime, lux: float) -> None:
         self._times.append(when)

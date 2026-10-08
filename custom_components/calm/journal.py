@@ -1,10 +1,9 @@
-"""Writing each room's own record to disk, one file per day.
+"""Each room's optional day file: one CSV per day, two weeks kept.
 
-Home Assistant's recorder keeps the sensor reading without the reasoning
-that went with it, and may be a database nobody can open. So a room keeps
-its own record next to the configuration: one line per sensor reading, one
-whenever somebody walks in or leaves, a heartbeat when nothing happens, and
-a fortnight kept. Every fix in September was found in these files.
+Off unless the household turns it on (Calm → Configure → Day file). It
+records every reading, every arrival and departure and the reason behind
+each decision, which Home Assistant's recorder keeps no trace of. Because
+it records when rooms are occupied, it is opt-in.
 """
 
 from __future__ import annotations
@@ -13,12 +12,12 @@ import csv
 import logging
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import Optional
+from typing import Any
 
 from homeassistant.core import HomeAssistant
 
 from .const import JOURNAL_DIR
-from .core import journal_columns, journal_row, slugify
+from .core import Command, journal_columns, journal_row
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -34,17 +33,17 @@ HEARTBEAT = timedelta(minutes=5)
 class Journal:
     """The day file for one room."""
 
-    def __init__(self, hass: HomeAssistant, room: str) -> None:
+    def __init__(self, hass: HomeAssistant, folder: str) -> None:
         self.hass = hass
-        self.directory = Path(hass.config.path(JOURNAL_DIR)) / (slugify(room) or "room")
-        self._last_written: Optional[datetime] = None
-        self._last_presence: tuple = (None, None)
-        self._last_reason: Optional[str] = None
-        self._pruned_on: Optional[date] = None
+        self.directory = journal_directory(hass, folder)
+        self._last_written: datetime | None = None
+        self._last_presence: tuple[bool | None, bool | None] = (None, None)
+        self._last_reason: str | None = None
+        self._pruned_on: date | None = None
 
     def should_write(
-        self, when: datetime, measured_lux: Optional[float],
-        motion: Optional[bool], occupied: Optional[bool], reason: Optional[str],
+        self, when: datetime, measured_lux: float | None,
+        motion: bool | None, occupied: bool | None, reason: str | None,
     ) -> bool:
         if measured_lux is not None:
             return True
@@ -57,8 +56,8 @@ class Journal:
         return self._last_written is None or when - self._last_written >= HEARTBEAT
 
     async def async_write(
-        self, when: datetime, measured_lux: Optional[float], command, commands_sent: int,
-        lit: bool, motion: Optional[bool], occupied: Optional[bool],
+        self, when: datetime, measured_lux: float | None, command: Command, commands_sent: int,
+        lit: bool, motion: bool | None, occupied: bool | None,
     ) -> None:
         reason = getattr(command, "reason", None)
         if not self.should_write(when, measured_lux, motion, occupied, reason):
@@ -73,11 +72,11 @@ class Journal:
         try:
             await self.hass.async_add_executor_job(self._append, when, row, prune)
         except OSError as error:
-            _LOGGER.warning("Calm: dagverslag niet geschreven: %s", error)
+            _LOGGER.warning("Calm: day file not written: %s", error)
 
-    def _append(self, when: datetime, row: list, prune: bool) -> None:
+    def _append(self, when: datetime, row: list[Any], prune: bool) -> None:
         self.directory.mkdir(parents=True, exist_ok=True)
-        path = self.directory / ("%s.csv" % when.date().isoformat())
+        path = self.directory / (f"{when.date().isoformat()}.csv")
         if prune:
             self._set_aside_if_foreign(path)
         with path.open("a", encoding="utf-8", newline="") as handle:
@@ -101,7 +100,7 @@ class Journal:
         with path.open(encoding="utf-8", newline="") as handle:
             header = next(csv.reader(handle), None)
         if header is not None and header != journal_columns():
-            path.rename(path.with_name(f"{path.stem}-eerder.csv"))
+            path.rename(path.with_name(f"{path.stem}-previous.csv"))
 
     def _prune(self, today: date) -> None:
         oldest = today - timedelta(days=RETENTION_DAYS)
@@ -112,3 +111,9 @@ class Journal:
                 continue  # not one of ours
             if when < oldest:
                 path.unlink(missing_ok=True)
+
+
+def journal_directory(hass: HomeAssistant, folder: str) -> Path:
+    """Where a room's day files live: one folder per room, by its id."""
+    return Path(hass.config.path(JOURNAL_DIR)) / folder
+

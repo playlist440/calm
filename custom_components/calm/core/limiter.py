@@ -26,14 +26,12 @@ That makes the asymmetry free, and two separate arguments say to take it:
 
 from __future__ import annotations
 
-from typing import Optional
-
 
 class SlewLimiter:
     """Caps how fast a value may move, separately in each direction."""
 
     def __init__(
-        self, up_per_minute: float, down_per_minute: Optional[float] = None
+        self, up_per_minute: float, down_per_minute: float | None = None
     ) -> None:
         if up_per_minute <= 0:
             raise ValueError("up_per_minute must be positive")

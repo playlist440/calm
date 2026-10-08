@@ -1,0 +1,25 @@
+{
+  "entity": {
+    "switch": {
+      "calm": { "default": "mdi:lightbulb-auto" },
+      "override": { "default": "mdi:lightbulb-group" }
+    },
+    "number": {
+      "threshold": { "default": "mdi:weather-sunset-down" },
+      "brightness": { "default": "mdi:brightness-7" },
+      "evening_brightness": { "default": "mdi:brightness-4" }
+    },
+    "sensor": {
+      "why": { "default": "mdi:head-question-outline" },
+      "daylight": { "default": "mdi:white-balance-sunny" },
+      "target": { "default": "mdi:target" },
+      "colour_temperature": { "default": "mdi:thermometer" },
+      "confidence": { "default": "mdi:gauge" },
+      "lamp_contribution": { "default": "mdi:lightbulb-on-outline" },
+      "commands_sent": { "default": "mdi:counter" }
+    },
+    "button": {
+      "resume": { "default": "mdi:restore" }
+    }
+  }
+}

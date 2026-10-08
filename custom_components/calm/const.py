@@ -94,3 +94,21 @@ JOURNAL_DIR: Final = "calm"
 
 #: Where the card lives, as the browser asks for it.
 CARD_URL: Final = "/calm_static/calm-card.js"
+
+# -- timing of a room inside Home Assistant ---------------------------------
+#: How long the first reading waits at a start for the lamps and the
+#: conditions to report.
+STARTUP_WAIT: Final = timedelta(minutes=2)
+#: How long after an off command's own fade a lamp may still report on
+#: before it is put out once more.
+PUT_OUT_GRACE: Final = timedelta(seconds=60)
+#: How long before a lamp that ignored an off command is asked again.
+STRAY_RETRY: Final = timedelta(minutes=5)
+#: The longest fade for putting out a lamp a scene does not drive.
+STRAY_MAX_TRANSITION_S: Final = 4.0
+#: How often a room's learned state is saved.
+SAVE_EVERY: Final = timedelta(minutes=15)
+#: Failed lamp commands in a row before it becomes a Repairs issue.
+FAILED_CALLS_BEFORE_ISSUE: Final = 5
+#: Option: write each room's day file. Off unless the household turns it on.
+CONF_JOURNAL: Final = "journal"

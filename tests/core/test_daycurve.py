@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import itertools
 from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
@@ -223,8 +224,8 @@ def test_the_evening_walks_the_colour_down_instead_of_holding_it():
         targets_at(local(2026, 10, 12, h, m), config=EVENING, anchor=20.0).kelvin
         for h, m in [(18, 30), (19, 0), (19, 30), (20, 0), (20, 30), (21, 0)]
     ]
-    for earlier, later in zip(colours, colours[1:]):
-        assert later < earlier, "de avond staat stil: %s" % colours
+    for earlier, later in itertools.pairwise(colours):
+        assert later < earlier, f"de avond staat stil: {colours}"
     assert colours[0] - colours[-1] > 2000
 
 

@@ -13,8 +13,8 @@ controller is left with a single knob: how high the whole profile sits.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Dict, Iterable, List, Optional
 
 from .photometry import perceptual_to_luminous
 
@@ -46,10 +46,10 @@ class Lamp:
 class DimProfile:
     """The lamps of one room and the fixed ratio between them."""
 
-    lamps: List[Lamp] = field(default_factory=list)
+    lamps: list[Lamp] = field(default_factory=list)
 
     @classmethod
-    def from_lamps(cls, lamps: Iterable[Lamp]) -> "DimProfile":
+    def from_lamps(cls, lamps: Iterable[Lamp]) -> DimProfile:
         """Build a profile from user configuration and normalise it once.
 
         Normalising scales the weights so the brightest lamp reaches full at
@@ -72,7 +72,7 @@ class DimProfile:
         return cls(lamps=selected)
 
     @property
-    def active(self) -> List[Lamp]:
+    def active(self) -> list[Lamp]:
         """Lamps that are switched on for this mode and carry any weight."""
         return [lamp for lamp in self.lamps if lamp.enabled and lamp.weight > 0]
 
@@ -110,7 +110,7 @@ class DimProfile:
             return 0.0
         return min(lamp.ceiling, max(lamp.floor, min(1.0, wanted)))
 
-    def levels(self, master: float) -> Dict[str, float]:
+    def levels(self, master: float) -> dict[str, float]:
         """Perceived level per lamp for a given master level."""
         return {
             lamp.id: self.level_at(lamp, master)
@@ -135,7 +135,7 @@ class DimProfile:
         """Lux on the sensor with the profile at full."""
         return self.luminous_at(1.0)
 
-    def master_for_lux(self, wanted_lux: float, tolerance: float = 1e-4) -> Optional[float]:
+    def master_for_lux(self, wanted_lux: float, tolerance: float = 1e-4) -> float | None:
         """Master level that produces ``wanted_lux``, or ``None`` if it can't.
 
         Solved by bisection rather than algebraically: with per-lamp weights
@@ -161,7 +161,7 @@ class DimProfile:
                 break
         return (low + high) / 2.0
 
-    def scaled(self, factor: float) -> "DimProfile":
+    def scaled(self, factor: float) -> DimProfile:
         """A copy with every contribution scaled — used when re-seeding."""
         return DimProfile(
             lamps=[
@@ -177,7 +177,7 @@ class DimProfile:
             ]
         )
 
-    def with_floor(self, floor: float) -> "DimProfile":
+    def with_floor(self, floor: float) -> DimProfile:
         """A copy where every lamp may go as low as ``floor``.
 
         For the nightlight, which is meant to be below what the room
@@ -198,7 +198,7 @@ class DimProfile:
             ]
         )
 
-    def with_enabled(self, ids: Iterable[str]) -> "DimProfile":
+    def with_enabled(self, ids: Iterable[str]) -> DimProfile:
         """A copy where only ``ids`` are on — how a mode reshapes the room."""
         wanted = set(ids)
         return DimProfile(

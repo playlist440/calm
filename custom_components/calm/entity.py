@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Any
 
+from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity import Entity
 
@@ -14,7 +15,7 @@ if TYPE_CHECKING:
     from .room import CalmRoom
 
 
-def device_name(data: dict) -> str:
+def device_name(data: dict[str, Any]) -> str:
     """"Calm", in the room's own area; "Calm <name>" for a room put together by hand.
 
     Home Assistant builds an entity id from the area, the device and the
@@ -40,7 +41,7 @@ class CalmEntity(Entity):
     _attr_has_entity_name = True
     _attr_should_poll = False
 
-    def __init__(self, hub: "CalmHub", subentry_id: str, data: dict, key: str) -> None:
+    def __init__(self, hub: CalmHub, subentry_id: str, data: dict[str, Any], key: str) -> None:
         self.hub = hub
         self.subentry_id = subentry_id
         self._attr_unique_id = f"{subentry_id}_{key}"
@@ -53,7 +54,7 @@ class CalmEntity(Entity):
         )
 
     @property
-    def room(self) -> Optional["CalmRoom"]:
+    def room(self) -> CalmRoom | None:
         return self.hub.rooms.get(self.subentry_id)
 
     @property
@@ -61,8 +62,21 @@ class CalmEntity(Entity):
         return self.room is not None
 
     async def async_added_to_hass(self) -> None:
+        self._refresh()
         await super().async_added_to_hass()
         self.async_on_remove(self.hub.add_listener(self.subentry_id, self._updated))
 
+    def _refresh(self) -> None:
+        """Work out the state from the room. Entities with costly state cache it here."""
+
+    @callback
     def _updated(self) -> None:
+        """Write the state, but only when it changed: every room runs often."""
+        self._refresh()
+        snapshot = (self.available, self.state, self.extra_state_attributes)
+        if snapshot == self._last_written:
+            return
+        self._last_written = snapshot
         self.async_write_ha_state()
+
+    _last_written: tuple[Any, ...] | None = None

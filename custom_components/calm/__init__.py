@@ -11,7 +11,7 @@ import logging
 from pathlib import Path
 
 from homeassistant.components.frontend import add_extra_js_url
-from homeassistant.components.http import StaticPathConfig
+from homeassistant.components.http import StaticPathConfig  # type: ignore[attr-defined]
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
@@ -20,7 +20,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.typing import ConfigType
 
 from .const import CARD_URL, DOMAIN
-from .hub import CalmHub
+from .hub import CalmHub, async_remove_room_files
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         if "frontend" in hass.config.components:
             add_extra_js_url(hass, CARD_URL)
         else:
-            _LOGGER.debug("Calm: geen frontend geladen, de Calm-kaart wordt niet aangeboden")
+            _LOGGER.debug("Calm: frontend not loaded, the Calm card is not offered")
     return True
 
 
@@ -79,20 +79,27 @@ async def async_unload_entry(hass: HomeAssistant, entry: CalmConfigEntry) -> boo
 
 async def _async_entry_updated(hass: HomeAssistant, entry: CalmConfigEntry) -> None:
     """Reload when the settings changed, but not for a room's own slider."""
-    if entry.runtime_data.needs_reload(entry):
+    hub = entry.runtime_data
+    await hub.async_drop_removed_rooms(entry)
+    if hub.needs_reload(entry):
         hass.config_entries.async_schedule_reload(entry.entry_id)
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Calm removed: delete every room's stored state and day files."""
+    await async_remove_room_files(hass, entry.entry_id, entry.subentries)
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Version one kept one entry per room and cannot be carried over.
 
-    Refusing is the honest answer: Home Assistant then says the entry needs
-    removing, and Calm 2.0 sets a room up again in a minute.
+    Refusing makes Home Assistant say the entry needs removing; Calm 2 then
+    sets a room up again in a minute.
     """
     if entry.version < 2:
         _LOGGER.error(
-            "Calm: '%s' komt uit Calm 1 en kan niet worden overgezet. "
-            "Verwijder hem en voeg Calm opnieuw toe.", entry.title,
+            "Calm: '%s' is a Calm 1 entry and cannot be migrated. Remove it and add Calm again.",
+            entry.title,
         )
         return False
     return True

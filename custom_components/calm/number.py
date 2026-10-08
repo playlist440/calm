@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from homeassistant.components.number import NumberEntity, NumberMode
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import LIGHT_LUX, PERCENTAGE
@@ -10,10 +12,13 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .const import SUBENTRY_ROOM
 from .entity import CalmEntity
+from .hub import CalmHub
+
+PARALLEL_UPDATES = 0
 
 
 async def async_setup_entry(
-    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddConfigEntryEntitiesCallback
+    hass: HomeAssistant, entry: ConfigEntry[CalmHub], async_add_entities: AddConfigEntryEntitiesCallback
 ) -> None:
     hub = entry.runtime_data
     for subentry_id, subentry in entry.subentries.items():
@@ -36,7 +41,7 @@ class ThresholdNumber(CalmEntity, NumberEntity):
     _attr_mode = NumberMode.BOX
     _attr_native_unit_of_measurement = LIGHT_LUX
 
-    def __init__(self, hub, subentry_id: str, data: dict) -> None:
+    def __init__(self, hub: CalmHub, subentry_id: str, data: dict[str, Any]) -> None:
         super().__init__(hub, subentry_id, data, "threshold")
 
     @property
@@ -58,7 +63,7 @@ class BrightnessNumber(CalmEntity, NumberEntity):
     _attr_mode = NumberMode.SLIDER
     _attr_native_unit_of_measurement = PERCENTAGE
 
-    def __init__(self, hub, subentry_id: str, data: dict) -> None:
+    def __init__(self, hub: CalmHub, subentry_id: str, data: dict[str, Any]) -> None:
         super().__init__(hub, subentry_id, data, "brightness")
 
     @property
@@ -80,7 +85,7 @@ class EveningBrightnessNumber(CalmEntity, NumberEntity):
     _attr_mode = NumberMode.SLIDER
     _attr_native_unit_of_measurement = PERCENTAGE
 
-    def __init__(self, hub, subentry_id: str, data: dict) -> None:
+    def __init__(self, hub: CalmHub, subentry_id: str, data: dict[str, Any]) -> None:
         super().__init__(hub, subentry_id, data, "evening_brightness")
 
     @property

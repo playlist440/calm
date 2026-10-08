@@ -81,7 +81,7 @@ class DayCurveConfig:
     #: colour fifty mired in the minute the sun sets, which is one of the
     #: few things in this system you would genuinely see happen.
     cool_cap_after_dark_kelvin: float = 4000.0
-    cap_fades_between_elevation: tuple = (3.0, -3.0)
+    cap_fades_between_elevation: tuple[float, float] = (3.0, -3.0)
     #: How long after bedtime the room takes to reach the night setting.
     #: Long enough that the dimming stays inside the rate limit: the drop
     #: from the evening figure to the night one is most of the range, and at
@@ -105,7 +105,7 @@ class DayCurveConfig:
 class DayCurve:
     """Turns a clock time and a solar elevation into a setpoint."""
 
-    def __init__(self, config: DayCurveConfig = None) -> None:
+    def __init__(self, config: DayCurveConfig | None = None) -> None:
         self.config = config or DayCurveConfig()
 
     def targets(
@@ -185,7 +185,7 @@ class DayCurve:
         fraction = math.log(lit_fraction / low) / math.log(high / low)
         return low_kelvin + (high_kelvin - low_kelvin) * fraction
 
-    def _cool_limit(self, solar_elevation: float, now: datetime = None) -> float:
+    def _cool_limit(self, solar_elevation: float, now: datetime | None = None) -> float:
         """Coolest the lamps may be: the sun shuts it, the evening shuts it further."""
         cfg = self.config
         high, low = cfg.cap_fades_between_elevation
@@ -356,7 +356,7 @@ class DayCurve:
 def _log_between(low: float, high: float, fraction: float) -> float:
     low = max(low, 1e-6)
     high = max(high, low * (1.0 + 1e-9))
-    return low * (high / low) ** max(0.0, min(1.0, fraction))
+    return float(low * (high / low) ** max(0.0, min(1.0, fraction)))
 
 
 def _hours_between(start: time, end: time) -> float:

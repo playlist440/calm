@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List
 
 from custom_components.calm.core.photometry import device_to_perceptual, perceptual_to_luminous
 
@@ -21,11 +20,11 @@ class SimulatedLamp:
 class SimulatedRoom:
     """Lamps plus daylight, added up the way light actually adds up."""
 
-    lamps: List[SimulatedLamp]
-    brightness: Dict[str, int] = field(default_factory=dict)
+    lamps: list[SimulatedLamp]
+    brightness: dict[str, int] = field(default_factory=dict)
     lights_on: bool = False
 
-    def apply(self, brightness: Dict[str, int]) -> None:
+    def apply(self, brightness: dict[str, int]) -> None:
         self.brightness = dict(brightness)
 
     def illuminance(self, daylight_lux: float) -> float:

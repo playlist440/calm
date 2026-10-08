@@ -18,8 +18,9 @@ Three things to leave out, and each was a real surprise in a real house:
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
-from typing import Iterable, List, Optional
+from typing import Any
 
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 from homeassistant.components.sensor import SensorDeviceClass
@@ -49,17 +50,17 @@ class AreaContents:
 
     area_id: str
     name: str
-    lights: List[str] = field(default_factory=list)
-    light_sensors: List[str] = field(default_factory=list)
-    motion_sensors: List[str] = field(default_factory=list)
+    lights: list[str] = field(default_factory=list)
+    light_sensors: list[str] = field(default_factory=list)
+    motion_sensors: list[str] = field(default_factory=list)
 
     @property
-    def light_sensor(self) -> Optional[str]:
+    def light_sensor(self) -> str | None:
         """The one Calm would pick, best first."""
         return self.light_sensors[0] if self.light_sensors else None
 
     @property
-    def motion_sensor(self) -> Optional[str]:
+    def motion_sensor(self) -> str | None:
         return self.motion_sensors[0] if self.motion_sensors else None
 
     @property
@@ -68,7 +69,7 @@ class AreaContents:
         return bool(self.lights) and bool(self.light_sensors)
 
 
-def scan(hass: HomeAssistant) -> List[AreaContents]:
+def scan(hass: HomeAssistant) -> list[AreaContents]:
     """Every area with at least one lamp in it, in the order people see them."""
     areas = ar.async_get(hass)
     found = [contents(hass, area.id) for area in areas.async_list_areas()]
@@ -78,7 +79,7 @@ def scan(hass: HomeAssistant) -> List[AreaContents]:
     )
 
 
-def contents(hass: HomeAssistant, area_id: str) -> Optional[AreaContents]:
+def contents(hass: HomeAssistant, area_id: str) -> AreaContents | None:
     """What one area has in it, right now."""
     area = ar.async_get(hass).async_get_area(area_id)
     if area is None:
@@ -128,7 +129,7 @@ def _usable(entry: er.RegistryEntry) -> bool:
     return entry.disabled_by is None and entry.platform != DOMAIN
 
 
-def _device_class(entry: er.RegistryEntry):
+def _device_class(entry: er.RegistryEntry) -> str | None:
     return entry.device_class or entry.original_device_class
 
 
@@ -150,10 +151,10 @@ def _hue_room_device(hass: HomeAssistant, entry: er.RegistryEntry) -> bool:
     if entry.platform != "hue" or entry.device_id is None:
         return False
     device = dr.async_get(hass).async_get(entry.device_id)
-    return device is not None and (device.model or "").casefold() in HUE_ROOM_MODELS
+    return isinstance(device, dr.DeviceEntry) and (device.model or "").casefold() in HUE_ROOM_MODELS
 
 
-def _best_first(hass: HomeAssistant, entries: List[er.RegistryEntry]) -> List[er.RegistryEntry]:
+def _best_first(hass: HomeAssistant, entries: list[er.RegistryEntry]) -> list[er.RegistryEntry]:
     """Hue's own room-wide sensor first, then the rest by name."""
     return sorted(
         entries,
@@ -161,7 +162,7 @@ def _best_first(hass: HomeAssistant, entries: List[er.RegistryEntry]) -> List[er
     )
 
 
-def room_lights(hass: HomeAssistant, data: dict) -> List[str]:
+def room_lights(hass: HomeAssistant, data: Mapping[str, Any]) -> list[str]:
     """The lamps a room drives: its area's, live, or the ones chosen by hand."""
     area_id = data.get("area_id")
     if area_id:
@@ -170,19 +171,19 @@ def room_lights(hass: HomeAssistant, data: dict) -> List[str]:
     return list(data.get("lights") or [])
 
 
-def room_light_sensor(hass: HomeAssistant, data: dict) -> Optional[str]:
+def room_light_sensor(hass: HomeAssistant, data: Mapping[str, Any]) -> str | None:
     chosen = data.get("light_sensor")
     if chosen:
-        return chosen
+        return str(chosen)
     area_id = data.get("area_id")
     found = contents(hass, area_id) if area_id else None
     return found.light_sensor if found else None
 
 
-def room_motion_sensor(hass: HomeAssistant, data: dict) -> Optional[str]:
+def room_motion_sensor(hass: HomeAssistant, data: Mapping[str, Any]) -> str | None:
     chosen = data.get("motion_sensor")
     if chosen:
-        return chosen
+        return str(chosen)
     area_id = data.get("area_id")
     found = contents(hass, area_id) if area_id else None
     return found.motion_sensor if found else None

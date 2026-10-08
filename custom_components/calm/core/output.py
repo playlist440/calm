@@ -29,14 +29,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple
 
 
 @dataclass(frozen=True)
 class LampGroup:
     """Lamps that want exactly the same thing, so they travel together."""
 
-    lamp_ids: Tuple[str, ...]
+    lamp_ids: tuple[str, ...]
     brightness: int
     mired: int
 
@@ -45,14 +44,14 @@ class LampGroup:
 class Emission:
     """What to put on the wire this tick. Empty groups means: nothing."""
 
-    groups: Tuple[LampGroup, ...]
+    groups: tuple[LampGroup, ...]
     transition_s: float
     reason: str
     #: Lamps that were being driven and no longer are, so they have to be put
     #: out. Not addressing a lamp is not the same as switching it off — it
     #: just leaves it wherever it was, which is how a lamp deselected from an
     #: override sits there still burning while the model believes it dark.
-    extinguish: Tuple[str, ...] = ()
+    extinguish: tuple[str, ...] = ()
 
     @property
     def commands(self) -> int:
@@ -88,8 +87,8 @@ class CommandPacer:
     #: always arrives mid-fade, so the light never stops moving.
     overlap: float = 1.25
 
-    _last: Dict[str, Tuple[int, int]] = field(default_factory=dict)
-    _last_sent: Optional[datetime] = None
+    _last: dict[str, tuple[int, int]] = field(default_factory=dict)
+    _last_sent: datetime | None = None
     #: Running count, for the diagnostics. The number people want when they
     #: ask what this is doing to their network.
     sent: int = 0
@@ -102,14 +101,14 @@ class CommandPacer:
     def emit(
         self,
         now: datetime,
-        brightness: Dict[str, int],
+        brightness: dict[str, int],
         mired: float,
-        transition_s: Optional[float] = None,
+        transition_s: float | None = None,
         force: bool = False,
     ) -> Emission:
         """Work out the smallest set of commands that says what is wanted."""
         wanted = {
-            lamp_id: (level, int(round(mired)))
+            lamp_id: (level, round(mired))
             for lamp_id, level in brightness.items()
         }
 
@@ -132,7 +131,7 @@ class CommandPacer:
 
     # -- the decisions -------------------------------------------------
 
-    def _due(self, now: datetime, wanted: Dict[str, Tuple[int, int]]) -> bool:
+    def _due(self, now: datetime, wanted: dict[str, tuple[int, int]]) -> bool:
         if self._last_sent is None or set(wanted) != set(self._last):
             return True
         since = (now - self._last_sent).total_seconds()
@@ -162,8 +161,8 @@ class CommandPacer:
         return gap * self.overlap
 
     @staticmethod
-    def _group(wanted: Dict[str, Tuple[int, int]]) -> Tuple[LampGroup, ...]:
-        buckets: Dict[Tuple[int, int], List[str]] = {}
+    def _group(wanted: dict[str, tuple[int, int]]) -> tuple[LampGroup, ...]:
+        buckets: dict[tuple[int, int], list[str]] = {}
         for lamp_id, state in sorted(wanted.items()):
             buckets.setdefault(state, []).append(lamp_id)
         return tuple(

@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass, field
-from typing import Optional
 
 
 @dataclass
@@ -26,20 +25,20 @@ class HueLightSensor:
     seed: int = 11
     _random: random.Random = field(init=False, repr=False)
     _since: float = field(init=False, default=0.0)
-    _last: Optional[int] = field(init=False, default=None)
+    _last: int | None = field(init=False, default=None)
 
     def __post_init__(self) -> None:
         self._random = random.Random(self.seed)
         # The first reading arrives at once, as it does when Home Assistant starts.
         self._since = self.min_interval_s
 
-    def observe(self, true_lux: float, dt_seconds: float) -> Optional[int]:
+    def observe(self, true_lux: float, dt_seconds: float) -> int | None:
         """What the sensor reports this tick, or ``None`` if it stays quiet."""
         self._since += dt_seconds
         if self._since < self.min_interval_s:
             return None
         noisy = true_lux * (1.0 + self._random.gauss(0.0, self.relative_noise))
-        value = max(0, int(round(noisy)))
+        value = max(0, round(noisy))
         if value == self._last:
             return None
         self._last = value

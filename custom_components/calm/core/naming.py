@@ -17,7 +17,7 @@ than not being able to edit it).
 from __future__ import annotations
 
 import unicodedata
-from typing import Iterable
+from collections.abc import Iterable
 
 #: Letters that survive Unicode decomposition intact, because they are not a
 #: base letter plus a mark — so stripping marks leaves them untouched and the
@@ -76,4 +76,4 @@ def unique_key(name: str, taken: Iterable[str]) -> str:
         candidate = base[: MAX_LENGTH - len(suffix)].strip("_") + suffix
         if candidate not in already:
             return candidate
-    raise ValueError("geen vrije sleutel meer voor %r" % name)
+    raise ValueError(f"geen vrije sleutel meer voor {name!r}")

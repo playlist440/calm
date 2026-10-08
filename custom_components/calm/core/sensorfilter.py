@@ -15,7 +15,6 @@ from __future__ import annotations
 import math
 from collections import deque
 from dataclasses import dataclass
-from typing import Deque, Optional
 
 
 @dataclass(frozen=True)
@@ -82,13 +81,13 @@ class SensorFilter:
         self.saturation_lux = saturation_lux
         self.spike_patience = spike_patience
 
-        self._window: Deque[float] = deque(maxlen=median_window)
-        self._average: Optional[float] = None
+        self._window: deque[float] = deque(maxlen=median_window)
+        self._average: float | None = None
         self._prompt: float = 0.0
         self._rejected_in_a_row = 0
 
     @property
-    def value(self) -> Optional[float]:
+    def value(self) -> float | None:
         return self._average
 
     def reset(self) -> None:

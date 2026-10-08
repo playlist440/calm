@@ -8,9 +8,8 @@ from __future__ import annotations
 import pytest
 
 from custom_components.calm.core import ContributionEstimator, DimProfile, Lamp
-from custom_components.calm.core.estimator import EstimatorConfig
 
-from .helpers import PRIOR_PER_LAMP, make_profile
+from .helpers import PRIOR_PER_LAMP
 
 PRIOR_TOTAL = PRIOR_PER_LAMP * 5
 
@@ -24,7 +23,8 @@ def drive(
     dt: float = 30.0,
 ):
     """Run a list of master levels past the estimator using a known truth."""
-    shape = lambda m: profile.luminous_at(m) / profile.full_contribution
+    def shape(m):
+        return profile.luminous_at(m) / profile.full_contribution
     for i, master in enumerate(schedule):
         measured = daylight(i) + true_total * shape(master)
         estimator.update(
@@ -99,7 +99,8 @@ def test_a_moved_sensor_is_noticed_and_recovered_from(profile):
     assert estimator.confidence > 0.8
 
     # Same room, sensor rehung: every coupling changes at once.
-    shape = lambda m: profile.luminous_at(m) / profile.full_contribution
+    def shape(m):
+        return profile.luminous_at(m) / profile.full_contribution
     worst = settled
     for master in sweep(3):
         estimator.update(
@@ -210,7 +211,8 @@ def test_a_step_that_had_to_be_cut_short_does_not_buy_certainty(profile):
     installation did, reporting 100% before it had finished moving.
     """
     estimator = ContributionEstimator(profile)
-    shape = lambda m: profile.luminous_at(m) / profile.full_contribution
+    def shape(m):
+        return profile.luminous_at(m) / profile.full_contribution
     for master in (0.2, 0.9, 0.2, 0.9):
         estimator.update(
             measured_lux=8.0 * shape(master),

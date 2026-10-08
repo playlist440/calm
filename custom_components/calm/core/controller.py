@@ -27,17 +27,18 @@ happen at once when they should.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, Optional, Set
+from typing import Any
 
 from .daycurve import DayCurve, Targets
 from .estimator import ContributionEstimator
 from .explain import Explanation, explain
+from .gate import DaylightGate, GateInput, Verdict
 from .limiter import SlewLimiter
 from .mapping import DaylightResponse
 from .melanopic import VERTICAL_FRACTION, melanopic_edi
-from .overrides import Override, OverrideSet, Source
+from .overrides import Override, OverrideSet
 from .photometry import kelvin_to_mired, perceptual_to_device, perceptual_to_luminous
 from .presence import PresenceHold
 from .profile import DimProfile
@@ -111,8 +112,7 @@ class ControllerConfig:
     mired_slew_per_minute: float = 8.0
     #: Multiplier on the brightness limit while somebody is moving about: a
     #: change in level is least noticeable when something else just happened.
-    #: Not on colour: 6 October, the bathroom's colour visibly sped up each
-    #: time somebody walked past the sensor.
+    #: Never on colour: a colour change sped up by movement is seen.
     motion_allowance: float = 4.0
     #: And during the wake-up ramp, which is the one change meant to be seen.
     morning_allowance: float = 6.0
@@ -211,9 +211,9 @@ class Command:
     action: Action
     master: float
     mired: float
-    brightness: Dict[str, int] = field(default_factory=dict)
+    brightness: dict[str, int] = field(default_factory=dict)
     transition_s: float = 0.0
-    diagnostics: Dict[str, Any] = field(default_factory=dict)
+    diagnostics: dict[str, Any] = field(default_factory=dict)
 
     @property
     def reason(self) -> str:
@@ -225,7 +225,7 @@ class _Want:
     scene: Scene
     rung: Rung
     reason: str
-    override: Optional[Override] = None
+    override: Override | None = None
 
 
 class RoomController:
@@ -237,10 +237,10 @@ class RoomController:
         settings: RoomSettings,
         day_curve: DayCurve,
         config: ControllerConfig,
-        estimator: Optional[ContributionEstimator] = None,
-        sensor_filter: Optional[SensorFilter] = None,
-        mapping: Optional[DaylightResponse] = None,
-        overrides: Optional[OverrideSet] = None,
+        estimator: ContributionEstimator | None = None,
+        sensor_filter: SensorFilter | None = None,
+        mapping: DaylightResponse | None = None,
+        overrides: OverrideSet | None = None,
     ) -> None:
         self.base_profile = profile
         self.profile = profile
@@ -261,14 +261,14 @@ class RoomController:
 
         #: What the lamps are doing, as far as we asked them.
         self.master = 0.0
-        self.mired: Optional[float] = None
+        self.mired: float | None = None
         self.lit = False
 
         self._enabled = False
-        self._inactive_because: Optional[str] = None
-        self._user_override: Optional[str] = None
-        self._auto_overrides: Set[str] = set()
-        self._manual_for: Optional[float] = None
+        self._inactive_because: str | None = None
+        self._user_override: str | None = None
+        self._auto_overrides: set[str] = set()
+        self._manual_for: float | None = None
         #: The lamps were switched off by hand. Respected until the room
         #: starts again: the signal comes back, or somebody arrives after it
         #: was empty.
@@ -277,14 +277,9 @@ class RoomController:
         #: The daylight gate. Separate from the scene, because it holds over
         #: whichever scene is running: a room that went dark for daylight in
         #: standby is still dark for daylight when somebody walks in.
-        self._daylight_off = False
-        self._bright_for = 0.0
-        self._dark_for = 0.0
-        #: A person asked for light: moved the line, pressed an override off,
-        #: or walked in. Ends the wait before coming back, once.
-        self._asked = False
+        self.gate = DaylightGate(self.config.on_dwell_s, self.config.off_dwell_s)
 
-        self._scene: Optional[_Want] = None
+        self._scene: _Want | None = None
         #: The lamps were found burning at the start and taken over as they
         #: were; see assume_lit.
         self._adopted = False
@@ -292,21 +287,21 @@ class RoomController:
         #: How the next change of scene should arrive, when something other
         #: than the scene itself decides it: a person asking, Calm taking the
         #: lamps back after a hand-hold, the daylight going unasked.
-        self._pending_transition: Optional[float] = None
-        self._pending_reason: Optional[str] = None
+        self._pending_transition: float | None = None
+        self._pending_reason: str | None = None
         self._occupied_before = True
-        self._reading: Optional[FilterReading] = None
+        self._reading: FilterReading | None = None
         self._silent_for = 0.0
         self._master_at_last_reading = 0.0
-        self._now: Optional[datetime] = None
-        self._last: Optional[Command] = None
+        self._now: datetime | None = None
+        self._last: Command | None = None
         self._pinned_for = 0.0
         self._allowance = 1.0
-        self.unreachable: Optional[str] = None
+        self.unreachable: str | None = None
 
     # -- what the world tells us --------------------------------------------
 
-    def set_enabled(self, enabled: bool, because: Optional[str] = None) -> None:
+    def set_enabled(self, enabled: bool, because: str | None = None) -> None:
         """Whether Calm runs this room right now, and if not, why not.
 
         ``because`` is only for the explanation: "nobody is home" says more
@@ -347,10 +342,10 @@ class RoomController:
         self._user_override = None
         # Handing the room back is a person asking for the ordinary room. If
         # that room is dark and waiting out a cloud, it has waited enough.
-        self._asked = True
+        self.gate.ask()
         return True
 
-    def set_auto_overrides(self, keys: Set[str]) -> None:
+    def set_auto_overrides(self, keys: set[str]) -> None:
         """Which overrides currently want to switch themselves on."""
         self._auto_overrides = {key for key in keys if key in self.overrides}
 
@@ -363,8 +358,8 @@ class RoomController:
         them not to touch it.
         """
         self.settings.threshold_lux = max(0.5, float(lux))
-        self._asked = True
-        self._bright_for = 0.0
+        self.gate.ask()
+        self.gate.restart_bright_wait()
 
     def set_brightness(self, level: float) -> None:
         self.settings.brightness = min(1.0, max(0.05, float(level)))
@@ -405,13 +400,12 @@ class RoomController:
         self.master = 0.0
         self.lit = False
 
-    def assume_lit(self, master: float, mired: Optional[float] = None) -> None:
+    def assume_lit(self, master: float, mired: float | None = None) -> None:
         """The room's lamps were already burning when Calm started.
 
-        Without this their light counts as daylight. 30 September, 21:07:
-        after a restart the kitchen lamps gave the sensor 13 lux, and Calm
-        took all of it for daylight. With the line below that, a restart at
-        night reads as a room in daylight, and the lamps burn on untended.
+        Their level and colour become the room's own, so their light is not
+        counted as daylight, and the room carries on from them under the
+        rate limit instead of arriving at its own setting in one step.
         """
         if self.lit or master <= 0.0:
             return
@@ -420,9 +414,6 @@ class RoomController:
         self._master_at_last_reading = self.master
         if mired:
             self.mired = mired
-        # And carry on from there under the limit. 30 September, 21:57: the
-        # first step after a restart treated the room as newly lit and put
-        # the kitchen from 95 to 60 percent in two seconds.
         self._adopted = True
 
     def release_manual(self) -> None:
@@ -439,18 +430,18 @@ class RoomController:
         return self._manual_for is not None or self._switched_off
 
     @property
-    def manual_remaining_s(self) -> Optional[float]:
+    def manual_remaining_s(self) -> float | None:
         if self._manual_for is None:
             return None
         return max(0.0, self.settings.manual_hold_s - self._manual_for)
 
     @property
-    def active_override(self) -> Optional[Override]:
+    def active_override(self) -> Override | None:
         want = self._scene
         return want.override if want and want.scene is Scene.OVERRIDE else None
 
     @property
-    def user_override_key(self) -> Optional[str]:
+    def user_override_key(self) -> str | None:
         return self._user_override
 
     @property
@@ -481,13 +472,13 @@ class RoomController:
         return self._silent_for > patience
 
     @property
-    def last_command(self) -> Optional[Command]:
+    def last_command(self) -> Command | None:
         return self._last
 
     # -- the loop ---------------------------------------------------------------
 
     def step(
-        self, now: datetime, measured_lux: Optional[float], dt_seconds: float
+        self, now: datetime, measured_lux: float | None, dt_seconds: float
     ) -> Command:
         """One tick.
 
@@ -528,10 +519,8 @@ class RoomController:
         targets = self._targets(now, elevation, want)
 
         if want.scene in (Scene.HANDS_OFF, Scene.OFF):
-            # Whatever the daylight gate knew was about a room that was
-            # running. When it runs again the first verdict comes fresh, at
-            # once; carrying the old wait over is how a person walked into a
-            # dark kitchen on 29 September and waited ten minutes.
+            # What the daylight gate knew was about a room that was running.
+            # When it runs again its first verdict comes fresh, at once.
             self._reset_gate()
         if want.scene is Scene.HANDS_OFF:
             return self._idle(targets, daylight, want, "manual")
@@ -644,85 +633,33 @@ class RoomController:
         arriving: bool,
         stale: bool,
         saturated: bool,
-    ) -> Optional[Command]:
+    ) -> Command | None:
         """Keep the lamps out while the daylight is doing the job.
 
         Returns a command when the gate decides, ``None`` to carry on and
-        light the room.
+        light the room. The rules live in :class:`DaylightGate`.
         """
-        cfg = self.config
         dark = self._dark(daylight, stale) and not saturated
         person = arriving or self._occupied_and_moving(want)
         if person and not dark and not self.lit and self._reading is not None:
-            # Somebody is standing in the room, so they get the most recent
-            # evidence rather than the averaged one. The filter holds back a
-            # sudden drop for one reading in case it is a passer-by; that is
-            # the right call for a room nobody is in, and the wrong one for
-            # somebody who just walked into it after the curtains closed.
-            # With the lamps out, the raw reading is the daylight.
+            # A person standing in the room gets the most recent evidence, not
+            # the averaged one. With the lamps out the raw reading is daylight.
             raw = self._reading.raw
             dark = raw < self.settings.threshold_lux and not self._reading.saturated
-
-        if self._daylight_off:
-            if not dark:
-                self._dark_for = 0.0
-                self._asked = False
-                return self._idle(targets, daylight, want, "daylight_sufficient",
-                                  rung=Rung.DAYLIGHT)
-            # Nobody waits out a cloud for a person standing in the room, and
-            # a sensor that has gone quiet cannot hold the room dark.
-            if stale:
-                self._come_back(True, "sensor_silent")
-                return None
-            if person:
-                self._come_back(True, "arrival" if arriving else "motion")
-                return None
-            if self._asked:
-                self._come_back(True, "asked")
-                return None
-            if self._freshest_says_bright():
-                # Coming back unasked is the one change nobody requested, so
-                # it waits for the freshest word to agree as well as the
-                # averaged one. The filter holds back a sudden rise for a
-                # reading just as it holds back a drop; without this, a cloud
-                # that passed would finish the wait during that held-back
-                # reading, and the lamps came on in a room at fifty lux.
-                self._dark_for = 0.0
-                return self._idle(
-                    targets, daylight, want, "waiting_to_return", rung=Rung.DAYLIGHT,
-                    returning_in_s=cfg.on_dwell_s,
-                )
-            self._dark_for += dt_seconds
-            if self._dark_for < cfg.on_dwell_s:
-                return self._idle(
-                    targets, daylight, want, "waiting_to_return", rung=Rung.DAYLIGHT,
-                    returning_in_s=cfg.on_dwell_s - self._dark_for,
-                )
-            self._come_back(False, "daylight_gone")
+        decision = self.gate.step(GateInput(
+            dark=dark, lit=self.lit, stale=stale, person=person, arriving=arriving,
+            freshest_bright=self._freshest_says_bright(), dt_seconds=dt_seconds,
+        ))
+        if decision.verdict is Verdict.LIGHT:
             return None
-
-        if dark:
-            self._bright_for = 0.0
+        if decision.verdict is Verdict.RETURN:
+            self._come_back(decision.by_person, decision.reason)
             return None
-
-        if not self.lit:
-            # Nothing is lit yet, and the daylight already does the job. The
-            # verdict is given now, not after ten minutes of lamps burning in
-            # a bright room: the wait is there to resist a change while the
-            # room is running, never to delay the first answer.
-            self._daylight_off = True
-            self._dark_for = 0.0
-            return self._idle(targets, daylight, want, "daylight_sufficient",
-                              rung=Rung.DAYLIGHT)
-
-        self._bright_for += dt_seconds
-        if self._bright_for < cfg.off_dwell_s:
-            return None
-        self._daylight_off = True
-        self._bright_for = 0.0
-        self._dark_for = 0.0
-        return self._turn_off(targets, daylight, want, "daylight_off",
-                              cfg.daylight_off_transition_s, rung=Rung.DAYLIGHT)
+        if decision.verdict is Verdict.TURN_OFF:
+            return self._turn_off(targets, daylight, want, decision.reason,
+                                  self.config.daylight_off_transition_s, rung=Rung.DAYLIGHT)
+        extra = {} if decision.returning_in_s is None else {"returning_in_s": decision.returning_in_s}
+        return self._idle(targets, daylight, want, decision.reason, rung=Rung.DAYLIGHT, **extra)
 
     def _freshest_says_bright(self) -> bool:
         """Whether the latest raw reading is past the line.
@@ -749,7 +686,6 @@ class RoomController:
 
     def _come_back(self, by_person: bool, reason: str) -> None:
         cfg = self.config
-        self._reset_gate()
         self._scene_changed = True
         self._pending_reason = reason
         # Somebody is waiting for it: quick. The daylight went on its own:
@@ -759,10 +695,7 @@ class RoomController:
         )
 
     def _reset_gate(self) -> None:
-        self._daylight_off = False
-        self._dark_for = 0.0
-        self._bright_for = 0.0
-        self._asked = False
+        self.gate.reset()
 
     # -- lighting ---------------------------------------------------------------
 
@@ -810,20 +743,21 @@ class RoomController:
             # the lamps come down to it, at the rate limit and no faster.
             proposed = min(proposed, max(self.profile.group_floor, self.brightness_cap))
 
+        now = self._now
+        assert now is not None
         allowance = 1.0
         if self.settings.has_motion_sensor and self.presence.detecting:
             allowance = cfg.motion_allowance
-        if self.day_curve.in_morning_ramp(self._now):
+        if self.day_curve.in_morning_ramp(now):
             allowance = max(allowance, cfg.morning_allowance)
         self._allowance = allowance
         self.master = self.brightness_limiter.step(
             self.master, proposed, dt_seconds, allowance
         )
-        colour_allowance = cfg.morning_allowance if self.day_curve.in_morning_ramp(self._now) else 1.0
-        if want.scene is Scene.ADAPTIVE and self.mired is not None and self.day_curve.in_evening(self._now):
-            # Once the evening has begun the colour only goes warmer. 6 October,
-            # 20:25: the bathroom went from dim to full, the comfort cap that
-            # had held it warm let go, and it walked cooler all evening.
+        colour_allowance = cfg.morning_allowance if self.day_curve.in_morning_ramp(now) else 1.0
+        if want.scene is Scene.ADAPTIVE and self.mired is not None and self.day_curve.in_evening(now):
+            # Once the evening has begun the colour only goes warmer, also when
+            # the comfort cap that held a dim room warm lets go.
             mired = max(mired, self.mired)
         self.mired = self._slew_colour(mired, dt_seconds, colour_allowance)
         return self._command(Action.APPLY, targets, daylight, want, want.reason)
@@ -833,7 +767,7 @@ class RoomController:
             return wanted
         return self.colour_limiter.step(self.mired, wanted, dt_seconds, allowance)
 
-    def _aim(self, targets: Targets, daylight: float, want: _Want):
+    def _aim(self, targets: Targets, daylight: float, want: _Want) -> tuple[float, float, bool]:
         """The level and colour this scene wants, and whether the level is set."""
         floor = self.profile.group_floor
         if want.scene is Scene.STANDBY:
@@ -842,7 +776,7 @@ class RoomController:
         if want.scene is Scene.NIGHTLIGHT:
             level = self.settings.nightlight_level
             return max(floor, level), kelvin_to_mired(self.settings.nightlight_kelvin), True
-        if want.scene is Scene.OVERRIDE and want.override.fixed_level is not None:
+        if want.scene is Scene.OVERRIDE and want.override is not None and want.override.fixed_level is not None:
             return max(floor, want.override.fixed_level), targets.mired, True
 
         wanted = self._desired_master(targets, daylight)
@@ -851,8 +785,6 @@ class RoomController:
             if (self.settings.has_motion_sensor and self.settings.use_motion
                     and self.settings.when_empty is EmptyAction.STANDBY):
                 # Somebody in the room never gets less than the empty room did.
-                # 8 October, 20:15: walking onto the landing took it from its
-                # standby 10% down to 4%.
                 wanted = max(wanted, self.settings.standby_level)
         return max(floor, min(1.0, wanted)), targets.mired, False
 
@@ -866,7 +798,7 @@ class RoomController:
         cfg = self.config
         if want.scene is Scene.STANDBY:
             return cfg.standby_fade_s
-        if want.scene is Scene.OVERRIDE:
+        if want.scene is Scene.OVERRIDE and want.override is not None:
             return want.override.transition_s
         if self._pending_transition is not None:
             return self._pending_transition
@@ -948,7 +880,7 @@ class RoomController:
 
     def _turn_off(
         self, targets: Targets, daylight: float, want: _Want, reason: str,
-        transition: float, rung: Optional[Rung] = None,
+        transition: float, rung: Rung | None = None,
     ) -> Command:
         self.lit = False
         self.master = 0.0
@@ -996,7 +928,7 @@ class RoomController:
     # -- the sensor -------------------------------------------------------------
 
     def _take_reading(
-        self, now: datetime, measured_lux: Optional[float], dt_seconds: float
+        self, now: datetime, measured_lux: float | None, dt_seconds: float
     ) -> None:
         if measured_lux is None:
             self._silent_for += dt_seconds
@@ -1028,7 +960,7 @@ class RoomController:
 
     def _command(
         self, action: Action, targets: Targets, daylight: float, want: _Want,
-        reason: str, transition: Optional[float] = None,
+        reason: str, transition: float | None = None,
     ) -> Command:
         levels = self.profile.levels(self.master)
         return self._remember(Command(
@@ -1044,7 +976,7 @@ class RoomController:
 
     def _idle(
         self, targets: Targets, daylight: float, want: _Want, reason: str,
-        rung: Optional[Rung] = None, **extra: Any,
+        rung: Rung | None = None, **extra: Any,
     ) -> Command:
         diagnostics = self._diagnostics(targets, daylight, want, reason, rung)
         diagnostics.update(extra)
@@ -1057,8 +989,8 @@ class RoomController:
 
     def _diagnostics(
         self, targets: Targets, daylight: float, want: _Want, reason: str,
-        rung: Optional[Rung] = None,
-    ) -> Dict[str, Any]:
+        rung: Rung | None = None,
+    ) -> dict[str, Any]:
         return {
             "reason": reason,
             "rung": (rung or want.rung).value,

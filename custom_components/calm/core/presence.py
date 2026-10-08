@@ -24,7 +24,6 @@ process restarted would be indefensible.
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Optional
 
 #: How long after the last movement the room still counts as occupied.
 #: Ten minutes is a compromise with a reason: a Hue sensor clears about a
@@ -39,7 +38,7 @@ class PresenceHold:
     def __init__(self, hold_s: float = DEFAULT_HOLD_S) -> None:
         self.hold_s = max(0.0, hold_s)
         self._detecting = False
-        self._since: Optional[datetime] = None
+        self._since: datetime | None = None
 
     def seen(self, when: datetime, detecting: bool) -> None:
         """What the sensor says, and when it started saying it.
@@ -79,10 +78,12 @@ class PresenceHold:
             return True
         if self._detecting:
             return True
+        assert self._since is not None
         return now - self._since < timedelta(seconds=self.hold_s)
 
     def empty_for(self, now: datetime) -> float:
         """Seconds since the room stopped counting as occupied. 0 while it is."""
         if self.occupied(now):
             return 0.0
+        assert self._since is not None
         return (now - self._since).total_seconds() - self.hold_s

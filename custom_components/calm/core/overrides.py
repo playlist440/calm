@@ -20,14 +20,17 @@ fixed modes would mean everybody bending their room into mine.
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass, field, replace
 from datetime import datetime, time
 from enum import Enum
-from typing import Any, Dict, Iterable, Iterator, List, Mapping, Optional
+from typing import Any, TypeVar
 
 from .naming import slugify, unique_key
 from .photometry import kelvin_to_mired
 from .profile import DimProfile, Lamp
+
+E = TypeVar("E", bound=Enum)
 
 
 class LevelMode(Enum):
@@ -100,9 +103,9 @@ class Override:
     #: reads as deliberate; instant reads as a glitch.
     transition_s: float = 2.5
     auto: AutoMode = AutoMode.NONE
-    auto_start: Optional[time] = None
-    auto_end: Optional[time] = None
-    auto_entity: Optional[str] = None
+    auto_start: time | None = None
+    auto_end: time | None = None
+    auto_entity: str | None = None
     #: The state of ``auto_entity`` that switches this override on.
     auto_state: str = "on"
 
@@ -137,7 +140,7 @@ class Override:
             )
         return DimProfile(lamps=lamps)
 
-    def target_lux(self, adaptive_lux: float) -> Optional[float]:
+    def target_lux(self, adaptive_lux: float) -> float | None:
         """What this override wants in lux. ``None`` means a set level."""
         if self.level_mode is LevelMode.FIXED:
             return None
@@ -151,14 +154,14 @@ class Override:
         return adaptive_mired
 
     @property
-    def fixed_level(self) -> Optional[float]:
+    def fixed_level(self) -> float | None:
         if self.level_mode is LevelMode.FIXED:
             return min(max(self.level, 0.0), 1.0)
         return None
 
     # -- whether it switches itself on ---------------------------------
 
-    def wants_on(self, now: datetime, entity_state: Optional[str] = None) -> bool:
+    def wants_on(self, now: datetime, entity_state: str | None = None) -> bool:
         """Whether this override would switch itself on right now.
 
         ``entity_state`` is the current state of ``auto_entity``, looked up by
@@ -178,7 +181,7 @@ class Override:
 
     # -- storage --------------------------------------------------------
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "key": self.key,
             "name": self.name,
@@ -198,7 +201,7 @@ class Override:
         }
 
     @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> "Override":
+    def from_dict(cls, data: Mapping[str, Any]) -> Override:
         """Read one back, tolerating anything that is missing.
 
         Settings written by an older version, or edited by hand, should
@@ -236,7 +239,7 @@ class Override:
 #: Starting points. Only the answers that do not depend on the room: which
 #: lamp is the reading lamp or sits by the television is something only the
 #: person setting it up knows, so templates leave every lamp as it is.
-TEMPLATES: Dict[str, Dict[str, Any]] = {
+TEMPLATES: dict[str, dict[str, Any]] = {
     "tv": {
         "level_mode": "relative", "level": 0.4,
         "colour_mode": "shift", "mired_shift": 60.0,
@@ -293,7 +296,7 @@ class OverrideSet:
     """
 
     def __init__(self, overrides: Iterable[Override] = ()) -> None:
-        self._items: List[Override] = []
+        self._items: list[Override] = []
         for override in overrides:
             self.add(override)
 
@@ -306,25 +309,25 @@ class OverrideSet:
     def __contains__(self, key: object) -> bool:
         return any(item.key == key for item in self._items)
 
-    def get(self, key: Optional[str]) -> Optional[Override]:
+    def get(self, key: str | None) -> Override | None:
         return next((item for item in self._items if item.key == key), None)
 
-    def keys(self) -> List[str]:
+    def keys(self) -> list[str]:
         return [item.key for item in self._items]
 
     def add(self, override: Override) -> Override:
         if not override.key:
             raise ValueError("an override without a key cannot be pointed at")
         if override.key in self:
-            raise ValueError("there is already an override with key %r" % override.key)
+            raise ValueError(f"there is already an override with key {override.key!r}")
         self._items.append(override)
         return override
 
-    def create(self, name: str, template: Optional[str] = None) -> Override:
+    def create(self, name: str, template: str | None = None) -> Override:
         """The only place a name becomes a key, so collisions settle in one place."""
         key = unique_key(name, self.keys())
         if not key:
-            raise ValueError("%r does not yield a usable name" % name)
+            raise ValueError(f"{name!r} does not yield a usable name")
         override = (
             from_template(template, name, key) if template else Override(key=key, name=name)
         )
@@ -342,11 +345,11 @@ class OverrideSet:
         self._items = [item for item in self._items if item.key != key]
         return len(self._items) != before
 
-    def to_list(self) -> List[Dict[str, Any]]:
+    def to_list(self) -> list[dict[str, Any]]:
         return [item.to_dict() for item in self._items]
 
     @classmethod
-    def from_list(cls, stored: Iterable[Mapping[str, Any]]) -> "OverrideSet":
+    def from_list(cls, stored: Iterable[Mapping[str, Any]]) -> OverrideSet:
         """Every stored override that can be read. The rest are skipped."""
         result = cls()
         for data in stored or ():
@@ -367,14 +370,14 @@ def _within(now: time, start: time, end: time) -> bool:
     return now >= start or now < end
 
 
-def _enum(kind, value, default):
+def _enum[E: Enum](kind: type[E], value: Any, default: E) -> E:
     try:
         return kind(value)
     except ValueError:
         return default
 
 
-def _time(value) -> Optional[time]:
+def _time(value: Any) -> time | None:
     if value in (None, ""):
         return None
     if isinstance(value, time):

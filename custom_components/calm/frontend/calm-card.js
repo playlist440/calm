@@ -71,6 +71,13 @@ function levelWord(words, lux) {
   return words.levels[index === -1 ? words.levels.length - 1 : index];
 }
 
+// Every Calm room's Why sensor, sorted by entity id.
+function calmRooms(hass) {
+  return Object.keys(hass.states)
+    .filter((id) => id.startsWith("sensor.") && hass.states[id].attributes.threshold_entity)
+    .sort();
+}
+
 function toPosition(lux) {
   const clamped = Math.min(MAX_LUX, Math.max(MIN_LUX, lux || MIN_LUX));
   return Math.log(clamped / MIN_LUX) / Math.log(MAX_LUX / MIN_LUX);
@@ -106,15 +113,22 @@ class CalmCard extends HTMLElement {
     return 3;
   }
 
+  // The first room in alphabetical order, so a new card is the same every time.
   static getStubConfig(hass) {
-    const found = Object.keys(hass.states).find(
-      (id) => id.startsWith("sensor.") && hass.states[id].attributes.threshold_entity
-    );
-    return { entity: found || "" };
+    const rooms = calmRooms(hass);
+    return { entity: rooms.length ? rooms[0] : "" };
+  }
+
+  static getConfigElement() {
+    return document.createElement("calm-card-editor");
+  }
+
+  getGridOptions() {
+    return { columns: 12, rows: 3, min_columns: 6, min_rows: 3 };
   }
 
   _words() {
-    const lang = (this._hass && this._hass.language) || "nl";
+    const lang = (this._hass && this._hass.language) || "en";
     return WORDS[lang.startsWith("nl") ? "nl" : "en"];
   }
 
@@ -130,7 +144,7 @@ class CalmCard extends HTMLElement {
           background: var(--disabled-color, #bdbdbd);
           transition: background 300ms, box-shadow 300ms;
         }
-        .lamp.lit { background: #f5b44a; box-shadow: 0 0 10px 3px rgba(245, 180, 74, 0.55); }
+        .lamp.lit { background: var(--state-light-active-color, var(--warning-color)); box-shadow: 0 0 10px 3px var(--state-light-active-color, var(--warning-color)); }
         .why { margin-top: 6px; color: var(--secondary-text-color); font-size: 0.92em; line-height: 1.4; }
         .bar {
           position: relative; height: 44px; margin-top: 30px; border-radius: 12px;
@@ -146,8 +160,8 @@ class CalmCard extends HTMLElement {
         .zone.off { right: 0; color: #463d2c; }
         .handle {
           position: absolute; top: -6px; bottom: -6px; width: 6px; margin-left: -3px; border-radius: 3px;
-          background: var(--primary-color, #c7771a);
-          box-shadow: 0 0 0 3px var(--card-background-color, #fff);
+          background: var(--primary-color);
+          box-shadow: 0 0 0 3px var(--card-background-color);
           cursor: grab;
         }
         .handle:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 4px; }
@@ -229,7 +243,7 @@ class CalmCard extends HTMLElement {
 
     this._el.name.textContent = a.room || state.attributes.friendly_name || "Calm";
     this._el.lamp.classList.toggle("lit", Boolean(a.lit));
-    this._el.why.textContent = state.state;
+    this._el.why.textContent = a.sentence || state.state;
     this._el.on.style.width = `${line}%`;
     this._el.off.style.width = `${100 - line}%`;
     this._el.on.textContent = line > 12 ? words.on : "";
@@ -320,6 +334,42 @@ class CalmCard extends HTMLElement {
     });
     this._render();
   }
+}
+
+// The visual editor: pick the room.
+class CalmCardEditor extends HTMLElement {
+  setConfig(config) {
+    this._config = config;
+    this._render();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    this._render();
+  }
+
+  _render() {
+    if (!this._hass || !this._config) return;
+    if (!this._form) {
+      this._form = document.createElement("ha-form");
+      this._form.computeLabel = () => "Calm";
+      this._form.addEventListener("value-changed", (event) => {
+        this._config = { ...this._config, ...event.detail.value };
+        this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: this._config } }));
+      });
+      this.appendChild(this._form);
+    }
+    this._form.hass = this._hass;
+    this._form.data = this._config;
+    this._form.schema = [{
+      name: "entity",
+      selector: { entity: { include_entities: calmRooms(this._hass) } },
+    }];
+  }
+}
+
+if (!customElements.get("calm-card-editor")) {
+  customElements.define("calm-card-editor", CalmCardEditor);
 }
 
 if (!customElements.get("calm-card")) {

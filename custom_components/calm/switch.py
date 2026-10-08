@@ -6,50 +6,47 @@ from typing import Any
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import STATE_ON
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
-from homeassistant.helpers.restore_state import RestoreEntity
 
 from .const import SUBENTRY_ROOM
 from .core import OverrideSet
+from .descriptions import SWITCH_KEY, override_key
 from .entity import CalmEntity
+from .hub import CalmHub
+
+PARALLEL_UPDATES = 0
 
 
 async def async_setup_entry(
-    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddConfigEntryEntitiesCallback
+    hass: HomeAssistant, entry: ConfigEntry[CalmHub], async_add_entities: AddConfigEntryEntitiesCallback
 ) -> None:
     hub = entry.runtime_data
     for subentry_id, subentry in entry.subentries.items():
         if subentry.subentry_type != SUBENTRY_ROOM:
             continue
         data = dict(subentry.data)
-        entities: list = [CalmSwitch(hub, subentry_id, data)]
+        entities: list[SwitchEntity] = [CalmSwitch(hub, subentry_id, data)]
         for override in OverrideSet.from_list(data.get("overrides") or []):
             entities.append(OverrideSwitch(hub, subentry_id, data, override.key, override.name))
         async_add_entities(entities, config_subentry_id=subentry_id)
 
 
-class CalmSwitch(CalmEntity, SwitchEntity, RestoreEntity):
+class CalmSwitch(CalmEntity, SwitchEntity):
     """On means Calm runs this room.
 
     The conditions set it when they change. In between, a person or an
     automation may flip it, and that holds until the conditions next change.
+    Its state before a restart is read back by the room itself, before the
+    room's first run.
     """
 
     #: Named after its device alone: switch.keuken_calm.
     _attr_name = None
 
-    def __init__(self, hub, subentry_id: str, data: dict) -> None:
-        super().__init__(hub, subentry_id, data, "calm")
+    def __init__(self, hub: CalmHub, subentry_id: str, data: dict[str, Any]) -> None:
+        super().__init__(hub, subentry_id, data, SWITCH_KEY)
         self._attr_translation_key = None
-
-    async def async_added_to_hass(self) -> None:
-        await super().async_added_to_hass()
-        last = await self.async_get_last_state()
-        room = self.room
-        if room is not None and last is not None:
-            room.restore_switch(last.state == STATE_ON)
 
     @property
     def is_on(self) -> bool:
@@ -71,10 +68,8 @@ class OverrideSwitch(CalmEntity, SwitchEntity):
     choice for now, and "now" does not survive a restart.
     """
 
-    _attr_translation_key = "override"
-
-    def __init__(self, hub, subentry_id: str, data: dict, key: str, name: str) -> None:
-        super().__init__(hub, subentry_id, data, f"override_{key}")
+    def __init__(self, hub: CalmHub, subentry_id: str, data: dict[str, Any], key: str, name: str) -> None:
+        super().__init__(hub, subentry_id, data, override_key(key))
         self._attr_translation_key = "override"
         self._attr_translation_placeholders = {"name": name}
         self._key = key

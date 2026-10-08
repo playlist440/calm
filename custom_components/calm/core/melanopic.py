@@ -39,7 +39,7 @@ Two honest caveats, because they change what the numbers mean in a room:
 
 from __future__ import annotations
 
-from typing import List, Tuple
+import itertools
 
 #: Melanopic daylight efficacy ratio against correlated colour temperature,
 #: for the phosphor-converted white LEDs used in lamps like these.
@@ -50,7 +50,7 @@ from typing import List, Tuple
 #: schedule below depends on is their *shape* — warming a lamp from 5000 K to
 #: 2200 K cuts its effect on the clock by roughly a factor of four, whatever
 #: the exact numbers turn out to be for a given bulb.
-_DER_BY_KELVIN: List[Tuple[float, float]] = [
+_DER_BY_KELVIN: list[tuple[float, float]] = [
     (1800.0, 0.13),
     (2000.0, 0.16),
     (2200.0, 0.20),
@@ -74,7 +74,7 @@ def melanopic_ratio(kelvin: float) -> float:
         return _DER_BY_KELVIN[0][1]
     if kelvin >= _DER_BY_KELVIN[-1][0]:
         return _DER_BY_KELVIN[-1][1]
-    for (k0, v0), (k1, v1) in zip(_DER_BY_KELVIN, _DER_BY_KELVIN[1:]):
+    for (k0, v0), (k1, v1) in itertools.pairwise(_DER_BY_KELVIN):
         if k0 <= kelvin <= k1:
             return v0 + (v1 - v0) * (kelvin - k0) / (k1 - k0)
     return _DER_BY_KELVIN[-1][1]
@@ -96,7 +96,7 @@ def colour_then_brightness(
     edi_target: float,
     warm_kelvin: float,
     cool_kelvin: float,
-) -> Tuple[float, float]:
+) -> tuple[float, float]:
     """Split a melanopic target into a colour and a brightness.
 
     Many pairs of (lux, kelvin) hit the same melanopic figure, so something

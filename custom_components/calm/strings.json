@@ -79,7 +79,8 @@
         "menu_options": {
           "rooms": "Rooms",
           "when": "When Calm runs",
-          "rhythm": "Your day"
+          "rhythm": "Your day",
+          "journal": "Day file"
         }
       },
       "rooms": {
@@ -149,6 +150,13 @@
               "cool_kelvin": "Coolest colour"
             }
           }
+        }
+      },
+      "journal": {
+        "title": "Day file",
+        "description": "Each room can write a file per day to config/calm: every reading, arrivals and departures, and why Calm did what it did. Useful to look back at an odd moment. It records when rooms are occupied, so it is off by default. Two weeks are kept.",
+        "data": {
+          "journal": "Keep a day file"
         }
       }
     }
@@ -427,7 +435,25 @@
     },
     "sensor": {
       "why": {
-        "name": "Why"
+        "name": "Why",
+        "state": {
+          "no_reading": "Waiting for the light sensor",
+          "manual": "Set by hand",
+          "switched_off": "Switched off by hand",
+          "override": "Override on",
+          "override_auto": "Override on by itself",
+          "daylight": "Enough daylight",
+          "returning": "Waiting to return",
+          "standby": "Standby",
+          "empty": "Nobody seen",
+          "inactive": "Calm not running",
+          "nightlight": "Nightlight",
+          "motion_while_off": "Light from motion",
+          "morning": "Morning",
+          "daytime": "Daytime",
+          "evening": "Evening",
+          "night": "Night"
+        }
       },
       "daylight": {
         "name": "Daylight"
@@ -456,8 +482,17 @@
   },
   "issues": {
     "condition_missing": {
-      "title": "Calm is watching something that no longer exists",
-      "description": "Calm only runs the lamps when {entity} is in the chosen state, but that entity no longer exists, so the lamps stay off.\n\nChoose another under Settings → Devices & services → Calm → Configure → When, or in the room itself if it has its own ‘when’."
+      "title": "Calm is watching something in {room} that no longer exists",
+      "description": "Calm only runs the lamps in {room} when {entity} is in the chosen state, but that entity no longer exists, so the lamps stay off.\n\nChoose another under Settings → Devices & services → Calm → Configure → When, or in the room itself if it has its own ‘when’."
+    },
+    "commands_failing": {
+      "title": "Calm cannot drive the lamps in {room}",
+      "description": "The latest commands to the lamps in {room} failed: {error}\n\nCheck that the lamps and their integration work in Home Assistant. This disappears by itself once a command succeeds again."
+    }
+  },
+  "device": {
+    "room": {
+      "name": "Calm"
     }
   }
 }

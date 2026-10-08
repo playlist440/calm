@@ -43,6 +43,8 @@ Then: *Settings → Devices & services → Add integration → Calm*. Tick your 
 
 ## The Calm card
 
+Add it from the dashboard's card picker (search for *Calm*) and pick the room, or in YAML:
+
 ```yaml
 type: custom:calm-card
 entity: sensor.kitchen_calm_why
@@ -50,17 +52,49 @@ entity: sensor.kitchen_calm_why
 
 Drag the line to set from how dark the lamps come on. The marker shows the daylight right now. Under the bar the card says what the setting under your finger means now, for example: *Now 34 lux of daylight on the sensor. At this setting the lamps stay off.* With the lamps on it takes their light off first, as Calm does.
 
-## A room's own record
+## What each room has
 
-Every room writes a day file to `config/calm/<room>/`: one line per sensor reading, with the rule that decided and the reason. Two weeks are kept. Open it in a spreadsheet when you want to know why something happened at half past nine last Tuesday.
+- **Calm** (switch): whether Calm runs the room right now.
+- **Why** (sensor): the reason the lamps are as they are, one of a fixed set; the full sentence is its `sentence` attribute.
+- **Lights on when darker than**, **How bright by day**, **How bright in the evening** (numbers).
+- **Take over again** (button): end a hand-hold now.
+- One switch per override, and diagnostic sensors (daylight, target, colour temperature, confidence, lamp contribution, commands sent), most of them disabled by default.
+
+Calm updates when a sensor reports, when somebody moves, when a lamp changes and every 30 seconds; it only sends a command when something changed enough to matter.
+
+## Supported devices
+
+Any lamps Home Assistant can dim, any illuminance sensor and any motion or occupancy sensor. Tested daily with Philips Hue lamps and Hue motion sensors. Hue room and zone groups are left out on purpose: Calm drives the lamps themselves.
+
+## Day file and diagnostics
+
+**Diagnostics** (the integration's ⋮ menu → *Download diagnostics*) show what every room believes: settings, lamps, sensors, the learned lamp contribution and the last command.
+
+**Day file** (off by default): *Calm → Configure → Day file*. Each room then writes a CSV per day to `config/calm/<room id>/`: every reading, every arrival and departure, and the reason behind each decision. Two weeks are kept. It records when rooms are occupied, which is why it is opt-in.
+
+## Known limitations
+
+- **Rooms sharing a light sensor** see each other's lamps as daylight. In practice this means a room needs a little less of its own light when the room next to it is lit, which is usually what you want.
+- The sensor measures where it hangs, not at your eyes. Set the line with the card while the room looks right to you.
+- A Hue motion sensor reports light about every five minutes, so a cloud shorter than that goes unseen.
+
+## Troubleshooting
+
+- **The lamps do nothing**: look at the room's *Why* sensor; it names the rule that applies. Calm → Settings → Repairs lists a condition entity that no longer exists, or lamp commands that keep failing.
+- **Calm steps aside unexpectedly**: something other than Calm changed a lamp: an automation, a Hue scene or a switch. Calm logs which lamp changed and what it had asked for at the INFO level.
+- **The card says "Custom element doesn't exist"**: reload the page with a cleared cache.
+
+## Removing Calm
+
+*Settings → Devices & services → Calm → ⋮ → Delete*. Calm removes its stored state and day files with it. Remove the card from your dashboards yourself.
 
 ## Development
 
 The control core (`custom_components/calm/core`) has no Home Assistant in it and is tested on its own, including whole simulated days. The Home Assistant side is tested against a real Home Assistant.
 
 ```bash
-uv venv --python 3.14 && uv pip install pytest-homeassistant-custom-component
-PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest
+uv venv --python 3.14 && uv pip install -r requirements_test.txt
+uv run ruff check custom_components tests && uv run mypy && uv run pytest
 ```
 
 ## License

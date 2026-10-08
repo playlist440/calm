@@ -29,7 +29,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
+from typing import Any
 
 from .profile import DimProfile
 
@@ -115,7 +115,7 @@ class ContributionEstimator:
         self,
         profile: DimProfile,
         prior_relative_uncertainty: float = 0.8,
-        config: EstimatorConfig = None,
+        config: EstimatorConfig | None = None,
     ) -> None:
         """The profile carries the prior; this class learns how wrong it is.
 
@@ -140,9 +140,9 @@ class ContributionEstimator:
         # mistake and produces gains tens of thousands of times too large.
         self._variance = min(prior_relative_uncertainty ** 2, self.config.max_variance)
 
-        self._last_shape: Optional[float] = None
-        self._last_measured: Optional[float] = None
-        self._last_seen: Optional[datetime] = None
+        self._last_shape: float | None = None
+        self._last_measured: float | None = None
+        self._last_seen: datetime | None = None
         self._daylight = 0.0
         self._cusum_up = 0.0
         self._cusum_down = 0.0
@@ -220,8 +220,8 @@ class ContributionEstimator:
         lights_on: bool,
         dt_seconds: float,
         trustworthy: bool = True,
-        smoothed_lux: Optional[float] = None,
-        now: Optional[datetime] = None,
+        smoothed_lux: float | None = None,
+        now: datetime | None = None,
     ) -> None:
         """Fold one sample in.
 
@@ -278,6 +278,7 @@ class ContributionEstimator:
         # Judged against the profile, not against the current estimate. Gate
         # it on the estimate and a collapsed one locks the door behind itself:
         # nothing looks big enough to learn from, so it can never recover.
+        assert self._last_shape is not None and self._last_measured is not None
         regressor = shape - self._last_shape
         if abs(regressor) < cfg.min_signal_fraction * self._profile.full_contribution:
             # The lamps barely moved. Nothing here is about them.
@@ -371,7 +372,7 @@ class ContributionEstimator:
             self._cusum_down = 0.0
             self.changes_detected += 1
 
-    def master_for(self, wanted_lux: float) -> Optional[float]:
+    def master_for(self, wanted_lux: float) -> float | None:
         """Master level that would put ``wanted_lux`` on the sensor.
 
         The profile knows the shape, this class knows the scale, and the
@@ -385,14 +386,11 @@ class ContributionEstimator:
     def profile(self) -> DimProfile:
         return self._profile
 
-    def snapshot(self) -> dict:
+    def snapshot(self) -> dict[str, Any]:
         """What was learned, so a restart does not throw it away.
 
-        Found the hard way: the estimate walked from 103 lux down towards 44
-        over an afternoon and jumped back to 103 on every restart, because
-        what got saved was the *prior* on each lamp and not the scale that
-        had been learned on top of it. Six restarts, six fresh starts, and a
-        sensor graph that looked like the thing could not make up its mind.
+        The learned scale is saved, not the prior on each lamp: saving the
+        prior would throw away what was learned at every restart.
         """
         return {
             "scale": self._scale,
@@ -401,7 +399,7 @@ class ContributionEstimator:
             "changes_detected": self.changes_detected,
         }
 
-    def restore(self, data: dict) -> None:
+    def restore(self, data: dict[str, Any]) -> None:
         if not data:
             return
         self._scale = max(1e-4, float(data.get("scale", self._scale)))

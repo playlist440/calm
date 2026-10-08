@@ -9,8 +9,11 @@ rebuilt with it, and nobody has to tell Calm.
 from __future__ import annotations
 
 import logging
+import shutil
+from collections.abc import Callable, Iterable, Mapping
 from datetime import time
-from typing import Any, Callable, Dict, List, Mapping, Optional
+from pathlib import Path
+from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import Event, HomeAssistant, callback
@@ -18,12 +21,14 @@ from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.debounce import Debouncer
+from homeassistant.helpers.storage import Store
 
 from . import discovery
 from .conditions import When
 from .const import (
     CONF_BED,
     CONF_COOL_KELVIN,
+    CONF_JOURNAL,
     CONF_OWN_RHYTHM,
     CONF_OWN_WHEN,
     CONF_RHYTHM,
@@ -38,11 +43,14 @@ from .const import (
     SUBENTRY_ROOM,
 )
 from .core import DayCurveConfig
-from .room import CalmRoom
+from .descriptions import room_entity_keys
+from .entity import device_name
+from .journal import journal_directory
+from .room import CalmRoom, store_key
 
 _LOGGER = logging.getLogger(__name__)
 
-def rhythm_from(data: Optional[Mapping[str, Any]]) -> DayCurveConfig:
+def rhythm_from(data: Mapping[str, Any] | None) -> DayCurveConfig:
     data = data or {}
     return DayCurveConfig(
         wake=_time(data.get(CONF_WAKE), DEFAULT_WAKE),
@@ -52,7 +60,7 @@ def rhythm_from(data: Optional[Mapping[str, Any]]) -> DayCurveConfig:
     )
 
 
-def _time(value, default: str) -> time:
+def _time(value: Any, default: str) -> time:
     try:
         return time.fromisoformat(str(value or default))
     except ValueError:
@@ -68,12 +76,13 @@ class CalmHub:
         options = entry.options
         self.when = When.from_dict(options.get(CONF_WHEN))
         self.rhythm = rhythm_from(options.get(CONF_RHYTHM))
-        self.rooms: Dict[str, CalmRoom] = {}
-        self._listeners: Dict[str, List[Callable[[], None]]] = {}
-        self._unsubscribe: List[Callable[[], None]] = []
+        self.journal = bool(options.get(CONF_JOURNAL))
+        self.rooms: dict[str, CalmRoom] = {}
+        self._listeners: dict[str, list[Callable[[], None]]] = {}
+        self._unsubscribe: list[Callable[[], None]] = []
         #: What each room was built from, to tell a change worth a rebuild
         #: from a registry event about something else entirely.
-        self._built_from: Dict[str, tuple] = {}
+        self._built_from: dict[str, tuple[Any, ...]] = {}
         self._rescan = Debouncer(
             hass, _LOGGER, cooldown=2.0, immediate=False, function=self._async_rescan
         )
@@ -102,23 +111,22 @@ class CalmHub:
             dr.EVENT_DEVICE_REGISTRY_UPDATED,
             ar.EVENT_AREA_REGISTRY_UPDATED,
         ):
-            self._unsubscribe.append(self.hass.bus.async_listen(event, self._registry_changed))
+            self._unsubscribe.append(self.hass.bus.async_listen(event, self._registry_changed))  # type: ignore[misc]
 
-    def _place_device(self, subentry_id: str, data: Dict[str, Any]) -> None:
+    def _place_device(self, subentry_id: str, data: dict[str, Any]) -> None:
         """Create the room's device in its area before any entity is made.
 
         Done first, and not by the first entity, because Home Assistant names
         every entity after the area its device is in at that moment: done any
         later and the first entity of a room is named differently from the rest.
         """
-        from .entity import device_name
-
         registry = dr.async_get(self.hass)
         device = registry.async_get_or_create(
             config_entry_id=self.entry.entry_id,
             config_subentry_id=subentry_id,
             identifiers={(DOMAIN, subentry_id)},
             name=device_name(data),
+            translation_key="room",
             manufacturer="Calm",
             entry_type=dr.DeviceEntryType.SERVICE,
         )
@@ -126,20 +134,25 @@ class CalmHub:
         if area_id and device.area_id is None:
             registry.async_update_device(device.id, area_id=area_id)
 
-    def expected_unique_ids(self) -> set:
+    def expected_unique_ids(self) -> set[str]:
         """Every entity the rooms under this entry should have right now."""
-        from .core import OverrideSet
-        from .sensor import NUMBERS
+        return {
+            f"{subentry_id}_{key}"
+            for subentry_id, subentry in self.entry.subentries.items()
+            if subentry.subentry_type == SUBENTRY_ROOM
+            for key in room_entity_keys(subentry.data)
+        }
 
-        expected = set()
-        for subentry_id, subentry in self.entry.subentries.items():
-            if subentry.subentry_type != SUBENTRY_ROOM:
-                continue
-            keys = ["calm", "why", "threshold", "brightness", "evening_brightness", "resume",
-                    *(d.key for d in NUMBERS)]
-            keys += [f"override_{o.key}" for o in OverrideSet.from_list(subentry.data.get("overrides") or [])]
-            expected |= {f"{subentry_id}_{key}" for key in keys}
-        return expected
+    async def async_drop_removed_rooms(self, entry: ConfigEntry) -> None:
+        """Stop rooms the entry no longer has, without saving, and delete
+        what they left behind: their learned state and their day files."""
+        removed = set(self.rooms) - set(entry.subentries)
+        for subentry_id in removed:
+            room = self.rooms.pop(subentry_id)
+            self._built_from.pop(subentry_id, None)
+            await room.async_stop(save=False)
+        if removed:
+            await async_remove_room_files(self.hass, entry.entry_id, removed)
 
     async def async_unload(self) -> None:
         for remove in self._unsubscribe:
@@ -150,13 +163,15 @@ class CalmHub:
             await room.async_stop()
         self.rooms.clear()
 
-    async def _async_start_room(self, subentry_id: str, data: Dict[str, Any]) -> None:
+    async def _async_start_room(
+        self, subentry_id: str, data: dict[str, Any], previous: CalmRoom | None = None
+    ) -> None:
         room = CalmRoom(self, subentry_id, data)
         self.rooms[subentry_id] = room
         self._built_from[subentry_id] = self._fingerprint(data)
-        await room.async_start()
+        await room.async_start(previous)
 
-    def _fingerprint(self, data: Mapping[str, Any]) -> tuple:
+    def _fingerprint(self, data: Mapping[str, Any]) -> tuple[Any, ...]:
         return (
             tuple(discovery.room_lights(self.hass, dict(data))),
             discovery.room_light_sensor(self.hass, dict(data)),
@@ -176,9 +191,9 @@ class CalmHub:
             fingerprint = self._fingerprint(room.data)
             if fingerprint == self._built_from.get(subentry_id):
                 continue
-            _LOGGER.info("%s: de ruimte in Home Assistant is veranderd, Calm neemt het over", room.name)
+            _LOGGER.info("%s: the area changed in Home Assistant; rebuilding the room", room.name)
             await room.async_stop()
-            await self._async_start_room(subentry_id, room.data)
+            await self._async_start_room(subentry_id, room.data, previous=room)
             self.notify(subentry_id)
 
     # -- settings written by a running room --------------------------------
@@ -204,7 +219,8 @@ class CalmHub:
         if rooms != set(self.rooms):
             return True
         if (When.from_dict(entry.options.get(CONF_WHEN)) != self.when
-                or rhythm_from(entry.options.get(CONF_RHYTHM)) != self.rhythm):
+                or rhythm_from(entry.options.get(CONF_RHYTHM)) != self.rhythm
+                or bool(entry.options.get(CONF_JOURNAL)) != self.journal):
             return True
         return any(
             dict(entry.subentries[subentry_id].data) != room.data
@@ -226,3 +242,15 @@ class CalmHub:
     def notify(self, subentry_id: str) -> None:
         for update in list(self._listeners.get(subentry_id, [])):
             update()
+
+
+async def async_remove_room_files(hass: HomeAssistant, entry_id: str, subentry_ids: Iterable[str]) -> None:
+    """Delete the stored state and day files of these rooms."""
+    for subentry_id in subentry_ids:
+        await Store[Any](hass, 1, store_key(entry_id, subentry_id)).async_remove()
+        await hass.async_add_executor_job(_remove_tree, journal_directory(hass, subentry_id))
+
+
+def _remove_tree(path: Path) -> None:
+    if path.is_dir():
+        shutil.rmtree(path, ignore_errors=True)

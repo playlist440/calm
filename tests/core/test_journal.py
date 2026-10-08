@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Optional
+from typing import Any
 
 from custom_components.calm.core import journal_columns, journal_row
 
@@ -15,12 +15,12 @@ WHEN = datetime(2026, 9, 29, 19, 29, 44, tzinfo=CEST)
 @dataclass
 class FakeCommand:
     master: float = 0.75
-    mired: Optional[float] = 403.0
-    diagnostics: Dict[str, Any] = field(default_factory=dict)
+    mired: float | None = 403.0
+    diagnostics: dict[str, Any] = field(default_factory=dict)
 
 
-def line(**diagnostics) -> Dict[str, str]:
-    return dict(zip(journal_columns(), journal_row(WHEN, 4.0, FakeCommand(diagnostics=diagnostics), 1)))
+def line(**diagnostics) -> dict[str, str]:
+    return dict(zip(journal_columns(), journal_row(WHEN, 4.0, FakeCommand(diagnostics=diagnostics), 1), strict=False))
 
 
 def test_a_line_has_one_value_for_every_column():
@@ -52,7 +52,7 @@ def test_the_time_is_written_with_its_offset():
 def test_a_line_without_a_fresh_reading_leaves_the_reading_empty():
     """Rather than repeating the last one, which would read as a sensor that
     kept speaking: the opposite of what the line is there to show."""
-    row = dict(zip(journal_columns(), journal_row(WHEN, None, FakeCommand(), 0)))
+    row = dict(zip(journal_columns(), journal_row(WHEN, None, FakeCommand(), 0), strict=False))
     assert row["measured_lux"] == ""
 
 
@@ -68,9 +68,9 @@ def test_a_stale_sensor_is_marked():
 def test_empty_is_not_the_same_as_no():
     """A room without a motion sensor leaves motion empty; a room whose
     sensor said "nothing" writes 0. A reader has to be able to tell them apart."""
-    without = dict(zip(journal_columns(), journal_row(WHEN, 4.0, FakeCommand(), 0)))
+    without = dict(zip(journal_columns(), journal_row(WHEN, 4.0, FakeCommand(), 0), strict=False))
     quiet = dict(zip(journal_columns(), journal_row(
-        WHEN, 4.0, FakeCommand(), 0, motion=False, occupied=False)))
+        WHEN, 4.0, FakeCommand(), 0, motion=False, occupied=False), strict=False))
     assert without["motion"] == "" and quiet["motion"] == "0"
 
 

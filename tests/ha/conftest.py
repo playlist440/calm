@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, Optional
 
 import pytest
 from homeassistant.core import HomeAssistant
@@ -25,7 +24,7 @@ class House:
 
     hass: HomeAssistant
     hue: MockConfigEntry
-    areas: Dict[str, str] = field(default_factory=dict)
+    areas: dict[str, str] = field(default_factory=dict)
 
     def area(self, name: str) -> str:
         if name not in self.areas:
@@ -46,12 +45,12 @@ class House:
         self,
         domain: str,
         object_id: str,
-        device_id: Optional[str] = None,
-        area: Optional[str] = None,
-        device_class: Optional[str] = None,
+        device_id: str | None = None,
+        area: str | None = None,
+        device_class: str | None = None,
         platform: str = "hue",
         state: str = "on",
-        attributes: Optional[dict] = None,
+        attributes: dict | None = None,
         disabled: bool = False,
     ) -> str:
         entry = er.async_get(self.hass).async_get_or_create(
