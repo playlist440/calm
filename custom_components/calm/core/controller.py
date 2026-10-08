@@ -848,6 +848,12 @@ class RoomController:
         wanted = self._desired_master(targets, daylight)
         if want.scene is Scene.ADAPTIVE:
             wanted = min(wanted, self.brightness_cap)
+            if (self.settings.has_motion_sensor and self.settings.use_motion
+                    and self.settings.when_empty is EmptyAction.STANDBY):
+                # Somebody in the room never gets less than the empty room did.
+                # 8 October, 20:15: walking onto the landing took it from its
+                # standby 10% down to 4%.
+                wanted = max(wanted, self.settings.standby_level)
         return max(floor, min(1.0, wanted)), targets.mired, False
 
     def _entry_transition(self, want: _Want) -> float:

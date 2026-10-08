@@ -39,6 +39,7 @@ class Expectation:
     brightness: Dict[str, int]
     mired: float
     until: datetime
+    issued_at: Optional[datetime] = None
 
 
 @dataclass
@@ -56,9 +57,15 @@ class ChangeAttributor:
     #: a set keeps whichever ids it feels like, which quietly throws away
     #: the newest — exactly the ones still in flight.
     remembered_contexts: int = 64
+    #: How long an earlier command still explains a report. Two spots on one
+    #: landing reported ten to thirty seconds apart, and a report of the
+    #: previous command arriving after the next one was sent read as a hand
+    #: (Overloop, 7 and 8 October: ten false takeovers in two days).
+    recent_s: float = 300.0
 
     _contexts: Deque[str] = field(default_factory=lambda: deque(maxlen=64))
     _expectation: Optional[Expectation] = None
+    _recent: Deque[Expectation] = field(default_factory=lambda: deque(maxlen=32))
 
     def issued(self, context_id: str) -> None:
         """Note a context id we are about to send a command under."""
@@ -76,10 +83,13 @@ class ChangeAttributor:
             brightness=dict(brightness),
             mired=mired,
             until=when + timedelta(seconds=transition_s + self.settle_margin_s),
+            issued_at=when,
         )
+        self._recent.append(self._expectation)
 
     def forget(self) -> None:
         self._expectation = None
+        self._recent.clear()
 
     # -- the judgement -------------------------------------------------
 
@@ -117,13 +127,20 @@ class ChangeAttributor:
             # we asked for, and none of those will match.
             return True
 
-        wanted = expectation.brightness.get(entity_id)
-        if wanted is None:
-            return False
         if brightness is None:
             return False
-        if abs(brightness - wanted) > self.brightness_tolerance:
-            return False
-        if mired is not None and abs(mired - expectation.mired) > self.mired_tolerance:
-            return False
-        return True
+        # Any of our commands of the last few minutes explains it: lamps report
+        # late and out of order, and the one that arrives may answer the
+        # command before last.
+        horizon = when - timedelta(seconds=self.recent_s)
+        for past in reversed(self._recent):
+            # The latest command always counts, however long ago it went out.
+            if past is not expectation and past.issued_at is not None and past.issued_at < horizon:
+                break
+            wanted = past.brightness.get(entity_id)
+            if wanted is None or abs(brightness - wanted) > self.brightness_tolerance:
+                continue
+            if mired is not None and past.mired is not None and abs(mired - past.mired) > self.mired_tolerance:
+                continue
+            return True
+        return False

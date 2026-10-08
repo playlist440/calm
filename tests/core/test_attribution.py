@@ -114,3 +114,21 @@ def test_after_a_fade_has_finished_a_stray_value_is_somebody_else():
     after = NOW + timedelta(minutes=8)
     assert a.is_ours(during, "light.spot_a", 90, 320.0)
     assert not a.is_ours(after, "light.spot_a", 90, 320.0)
+
+
+def test_a_late_report_of_the_command_before_last_is_ours():
+    """Overloop, 8 October 20:16: a spot reported the standby level it had
+    been sent, after Calm had already asked for the next level."""
+    a = ChangeAttributor()
+    a.expect(NOW, {"light.spot_w5": 26, "light.spot_w6": 26}, mired=417.0, transition_s=2.0)
+    a.expect(NOW + timedelta(minutes=2), {"light.spot_w5": 10, "light.spot_w6": 10}, mired=300.0, transition_s=2.0)
+    later = NOW + timedelta(minutes=3)
+    assert a.is_ours(later, "light.spot_w5", 26, 417.0), "een late melding werd een hand"
+
+
+def test_an_old_command_no_longer_explains_a_change():
+    a = ChangeAttributor()
+    a.expect(NOW, {"light.spot_w5": 26}, mired=417.0, transition_s=2.0)
+    a.expect(NOW + timedelta(minutes=20), {"light.spot_w5": 200}, mired=300.0, transition_s=2.0)
+    later = NOW + timedelta(minutes=22)
+    assert not a.is_ours(later, "light.spot_w5", 26, 417.0)

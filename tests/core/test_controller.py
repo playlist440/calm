@@ -325,6 +325,20 @@ def test_in_the_evening_the_colour_only_gets_warmer():
     assert c.mired >= start - 1e-9, "'s avonds werd het licht koeler"
 
 
+def test_walking_in_never_dims_below_standby():
+    """8 October, 20:15: walking onto the landing took it from its standby
+    10% down to 4%."""
+    c = kitchen(standby_level=0.10)
+    c.set_enabled(True)
+    clock = Clock(c, at(30, 20, 0))
+    settled_empty(clock, 2.0)
+    assert c.master == pytest.approx(0.10, abs=0.01)
+    clock.move(True)
+    clock.tick(2.0)
+    clock.run(2, lux=20.0)
+    assert c.master >= 0.10 - 1e-9, "binnenlopen maakte het donkerder dan standby"
+
+
 def test_the_evening_is_never_brighter_than_the_day():
     c = room(brightness=0.5, evening_brightness=0.9)
     c.set_enabled(True)
