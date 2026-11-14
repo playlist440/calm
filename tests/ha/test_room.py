@@ -245,7 +245,7 @@ async def test_the_room_keeps_its_own_day_file(hass, kitchen, freezer) -> None:
     home(hass)
     hass.states.async_set(kitchen["room_lux"], "2")
     entry = await start(hass, kitchen, options={"when": {"home": True}, "journal": True})
-    await hass.async_block_till_done()
+    await hass.async_block_till_done(wait_background_tasks=True)
     files = list(Path(hass.config.path("calm", next(iter(entry.subentries)))).glob("*.csv"))
     assert files, "er werd geen dagverslag geschreven"
     lines = files[0].read_text().splitlines()
@@ -313,7 +313,7 @@ async def test_a_day_file_from_calm_1_is_set_aside_not_mixed(hass, kitchen) -> N
     room = entry.runtime_data.rooms[next(iter(entry.subentries))]
     room.journal._pruned_on = None
     room._run(2.0)
-    await hass.async_block_till_done()
+    await hass.async_block_till_done(wait_background_tasks=True)
     assert (folder / "2026-09-29-previous.csv").exists(), "het oude dagverslag werd niet apart gezet"
     header = (folder / "2026-09-29.csv").read_text().splitlines()[0]
     assert "rung" in header

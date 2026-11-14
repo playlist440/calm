@@ -164,7 +164,7 @@ async def test_a_removed_room_leaves_nothing_behind(hass, kitchen, lamp_calls, h
     subentry_id = next(iter(entry.subentries))
     key = f"{DOMAIN}.{entry.entry_id}.{subentry_id}"
     journal = Path(hass.config.path("calm", subentry_id))
-    await hass.async_block_till_done()
+    await hass.async_block_till_done(wait_background_tasks=True)
     room = entry.runtime_data.rooms[subentry_id]
     await room._save()
     assert key in hass_storage and journal.exists()
@@ -206,3 +206,49 @@ def lamp_calls(hass: HomeAssistant):
     from pytest_homeassistant_custom_component.common import async_mock_service
     async_mock_service(hass, "light", "turn_off")
     return async_mock_service(hass, "light", "turn_on")
+
+
+async def test_the_switch_is_restored_on_home_assistant_2026_11_too(hass, kitchen, lamp_calls, monkeypatch) -> None:
+    """2026.11 removed ``last_states``; Calm then failed to start at all."""
+    from custom_components.calm import room as room_module
+
+    class NewStyle:
+        def async_get_stored_state(self, entity_id):
+            return type("S", (), {"state": State(entity_id, "on")})()
+
+    monkeypatch.setattr(room_module, "async_get_restore_data", lambda hass: NewStyle())
+    await amsterdam(hass)
+    home(hass)
+    hass.states.async_set(kitchen["room_lux"], "2")
+    entry = MockConfigEntry(
+        domain=DOMAIN, version=2, title="Calm", options={"when": {"manual": True}},
+        subentries_data=[ConfigSubentryData(
+            data={"area_id": kitchen["area"], "name": "Keuken", "threshold_lux": 25.0},
+            subentry_type="room", title="Keuken", unique_id=kitchen["area"])])
+    entry.add_to_hass(hass)
+    er.async_get(hass).async_get_or_create("switch", DOMAIN, f"{next(iter(entry.subentries))}_calm",
+                                           suggested_object_id="keuken_calm", config_entry=entry)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert entry.runtime_data.rooms[next(iter(entry.subentries))].switch_on
+
+
+async def test_a_restore_that_fails_does_not_stop_calm(hass, kitchen, lamp_calls, monkeypatch) -> None:
+    from custom_components.calm import room as room_module
+
+    class Broken:
+        pass
+
+    monkeypatch.setattr(room_module, "async_get_restore_data", lambda hass: Broken())
+    await amsterdam(hass)
+    home(hass)
+    hass.states.async_set(kitchen["room_lux"], "2")
+    entry = MockConfigEntry(
+        domain=DOMAIN, version=2, title="Calm", options={"when": {"manual": True}},
+        subentries_data=[ConfigSubentryData(
+            data={"area_id": kitchen["area"], "name": "Keuken", "threshold_lux": 25.0},
+            subentry_type="room", title="Keuken", unique_id=kitchen["area"])])
+    entry.add_to_hass(hass)
+    er.async_get(hass).async_get_or_create("switch", DOMAIN, f"{next(iter(entry.subentries))}_calm",
+                                           suggested_object_id="keuken_calm", config_entry=entry)
+    assert await hass.config_entries.async_setup(entry.entry_id), "Calm startte niet meer op"

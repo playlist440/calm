@@ -258,7 +258,14 @@ class CalmRoom:
         if not self.when.manual:
             return
         entity_id = er.async_get(self.hass).async_get_entity_id("switch", DOMAIN, f"{self.subentry_id}_calm")
-        stored = async_get_restore_data(self.hass).last_states.get(entity_id) if entity_id else None
+        if not entity_id:
+            return
+        try:
+            stored = _stored_state(async_get_restore_data(self.hass), entity_id)
+        except Exception:
+            _LOGGER.warning("%s: could not read the Calm switch's state from before the restart", self.name,
+                            exc_info=True)
+            return
         if stored is not None:
             self.switch_on = stored.state.state == STATE_ON
 
@@ -545,3 +552,14 @@ def _number(state: Any) -> float | None:
         return float(state.state)
     except (TypeError, ValueError):
         return None
+
+
+def _stored_state(data: Any, entity_id: str) -> Any:
+    """An entity's state from before the restart, across Home Assistant versions.
+
+    2026.11 replaced the ``last_states`` dictionary with ``async_get_stored_state``.
+    """
+    if hasattr(data, "async_get_stored_state"):
+        return data.async_get_stored_state(entity_id)
+    return data.last_states.get(entity_id)
+
