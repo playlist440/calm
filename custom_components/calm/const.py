@@ -89,6 +89,8 @@ DEFAULT_COOL_KELVIN: Final = 5000
 #: something has changed enough to be worth a command.
 TICK: Final = timedelta(seconds=30)
 
+#: The highest the line may be set. An outdoor sensor reads thousands of lux.
+MAX_THRESHOLD: Final = 5000
 #: Where each room keeps its own day file, under the configuration folder.
 JOURNAL_DIR: Final = "calm"
 

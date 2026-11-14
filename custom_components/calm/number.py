@@ -10,7 +10,7 @@ from homeassistant.const import LIGHT_LUX, PERCENTAGE
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .const import SUBENTRY_ROOM
+from .const import MAX_THRESHOLD, SUBENTRY_ROOM
 from .entity import CalmEntity
 from .hub import CalmHub
 
@@ -36,7 +36,7 @@ class ThresholdNumber(CalmEntity, NumberEntity):
     """"Lampen aan als het donkerder is dan": the line on the card's slider."""
 
     _attr_native_min_value = 1
-    _attr_native_max_value = 300
+    _attr_native_max_value = MAX_THRESHOLD
     _attr_native_step = 1
     _attr_mode = NumberMode.BOX
     _attr_native_unit_of_measurement = LIGHT_LUX

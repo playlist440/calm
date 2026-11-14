@@ -92,6 +92,7 @@ from .const import (
     DEFAULT_WAKE,
     DEFAULT_WARM_KELVIN,
     DOMAIN,
+    MAX_THRESHOLD,
     SUBENTRY_ROOM,
 )
 from .core import (
@@ -591,7 +592,7 @@ class RoomFlow(ConfigSubentryFlow):
             vol.Required("light"): section(vol.Schema({
                 vol.Required(CONF_THRESHOLD, default=data.get(CONF_THRESHOLD, DEFAULT_THRESHOLD)):
                     selector.NumberSelector(selector.NumberSelectorConfig(
-                        min=1, max=300, step=1, unit_of_measurement="lx",
+                        min=1, max=MAX_THRESHOLD, step=1, unit_of_measurement="lx",
                         mode=selector.NumberSelectorMode.BOX)),
                 vol.Required(CONF_BRIGHTNESS, default=data.get(CONF_BRIGHTNESS, DEFAULT_BRIGHTNESS)):
                     _percent(5, 100, 5),

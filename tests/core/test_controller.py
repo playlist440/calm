@@ -783,3 +783,23 @@ def test_lowering_the_line_does_not_put_the_room_out_any_faster():
     c.set_threshold(10.0)
     clock.run(8, lux=150.0)
     assert c.lit, "de lampen gingen uit omdat iemand aan de schuif zat"
+
+
+def test_a_line_for_an_outdoor_sensor_can_be_reached():
+    """GitHub issue 1: an outdoor sensor reads thousands of lux, and a line
+    above the old fixed saturation point of 2000 lux could never be dark."""
+    c = room(threshold_lux=3000.0)
+    c.set_enabled(True)
+    clock = Clock(c, at(30, 17))
+    clock.run(20, lux=2500.0)
+    assert c.lit, "2500 lux onder een lijn van 3000 telde niet als donker"
+    clock.run(20, lux=4000.0)
+    clock.run(15, lux=4000.0)
+    assert not c.lit
+
+
+def test_moving_the_line_moves_the_saturation_point():
+    c = room(threshold_lux=25.0)
+    assert c.filter.saturation_lux == 2000.0
+    c.set_threshold(4000.0)
+    assert c.filter.saturation_lux == 16000.0

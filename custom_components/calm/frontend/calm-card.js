@@ -16,7 +16,15 @@
  */
 
 const MIN_LUX = 1;
-const MAX_LUX = 1000;
+// The bar ends at 1000 lux for a sensor indoors, and at 10000 once the line
+// is set for an outdoor sensor.
+const INDOOR_MAX_LUX = 1000;
+const OUTDOOR_MAX_LUX = 10000;
+let MAX_LUX = INDOOR_MAX_LUX;
+
+function scaleFor(threshold) {
+  return threshold >= 500 ? OUTDOOR_MAX_LUX : INDOOR_MAX_LUX;
+}
 
 const WORDS = {
   nl: {
@@ -88,7 +96,8 @@ function toLux(position) {
   const lux = MIN_LUX * Math.pow(MAX_LUX / MIN_LUX, p);
   // Whole lux below a hundred, fives above: finer than a sensor can tell
   // apart is only noise on a slider.
-  return lux < 100 ? Math.round(lux) : Math.round(lux / 5) * 5;
+  if (lux < 100) return Math.round(lux);
+  return lux < 1000 ? Math.round(lux / 5) * 5 : Math.round(lux / 50) * 50;
 }
 
 class CalmCard extends HTMLElement {
@@ -239,6 +248,8 @@ class CalmCard extends HTMLElement {
     const a = state.attributes;
     const threshold = this._dragging !== null ? this._dragging : Number(a.threshold_lux);
     const daylight = Number(a.daylight_lux);
+    // The scale stays put while dragging, so the line does not jump under the finger.
+    if (this._dragging === null) MAX_LUX = scaleFor(Number(a.threshold_lux));
     const line = toPosition(threshold) * 100;
 
     this._el.name.textContent = a.room || state.attributes.friendly_name || "Calm";

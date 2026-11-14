@@ -49,6 +49,10 @@ from .sun import solar_elevation
 #: The nightlight may go below the room's lowest setting, down to the least
 #: a lamp shows: one step of Home Assistant's 0..255.
 NIGHTLIGHT_FLOOR = 1.0 / 255.0
+#: The sensor counts as pinned from this many lux, or this many times the
+#: line when that is higher.
+SATURATION_FLOOR_LUX = 2000.0
+SATURATION_MARGIN = 4.0
 
 
 class EmptyAction(Enum):
@@ -249,6 +253,7 @@ class RoomController:
         self.config = config
         self.estimator = estimator or ContributionEstimator(profile)
         self.filter = sensor_filter or SensorFilter()
+        self._follow_threshold()
         self.mapping = mapping or DaylightResponse()
         self.overrides = overrides if overrides is not None else OverrideSet()
 
@@ -358,8 +363,17 @@ class RoomController:
         them not to touch it.
         """
         self.settings.threshold_lux = max(0.5, float(lux))
+        self._follow_threshold()
         self.gate.ask()
         self.gate.restart_bright_wait()
+
+    def _follow_threshold(self) -> None:
+        """Keep the sensor's saturation point well above the line.
+
+        A reading at or above it counts as the sensor being pinned, never as
+        dark, so a fixed point would make a line above it unreachable.
+        """
+        self.filter.saturation_lux = max(SATURATION_FLOOR_LUX, SATURATION_MARGIN * self.settings.threshold_lux)
 
     def set_brightness(self, level: float) -> None:
         self.settings.brightness = min(1.0, max(0.05, float(level)))
